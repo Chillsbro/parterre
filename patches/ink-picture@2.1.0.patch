@@ -1,0 +1,48 @@
+diff --git a/node_modules/ink-picture/.bun-tag-31561c098466bbd b/.bun-tag-31561c098466bbd
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/build/InkPictureProvider.js b/build/InkPictureProvider.js
+index 26a42a681bb0d39c471e00540fd4ca0c5080eb29..2c9abaea07a3bf0bad2368ef3c916dbd045d5f7d 100644
+--- a/build/InkPictureProvider.js
++++ b/build/InkPictureProvider.js
+@@ -146,7 +146,23 @@ export function InkPictureProvider({ children, config, terminalInfo: overrides,
+         };
+         return c;
+     }, [config]);
++    // When the host supplies complete terminal info, never touch stdin:
++    // the runtime probe replaces stdin.push and can break interactive input.
++    const hasCompleteOverrides = !!overrides &&
++        overrides.cellWidth !== undefined &&
++        overrides.cellHeight !== undefined &&
++        overrides.supportsSixelGraphics !== undefined &&
++        overrides.supportsKittyGraphics !== undefined &&
++        overrides.supportsITerm2Graphics !== undefined;
+     useEffect(() => {
++        if (hasCompleteOverrides) {
++            const info = { ...defaultTerminalInfo, ...overrides };
++            info.supportsUnicode = overrides.supportsUnicode ?? checkIsUnicodeSupported();
++            info.supportsColor = overrides.supportsColor ?? !!supportsColor.stdout;
++            setTerminalInfo(info);
++            onTerminalInfoDetection?.(info);
++            return;
++        }
+         const controller = new AbortController();
+         const queryTerminalInfo = async () => {
+             const result = await queryTerminal(stdin, setRawMode, controller.signal);
+diff --git a/build/utils/queryTerminal.js b/build/utils/queryTerminal.js
+index 431182059e50d415a8a20c4c2e983b7c1d834f95..253733bf0dbfa7856c95ba274c133bc6ad08462e 100644
+--- a/build/utils/queryTerminal.js
++++ b/build/utils/queryTerminal.js
+@@ -158,7 +158,11 @@ export function queryTerminal(stdin, setRawMode, signal) {
+             }
+         };
+         stdin.push = (chunk) => {
+-            const str = Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
++            const str = typeof chunk === "string"
++                ? chunk
++                : ArrayBuffer.isView(chunk)
++                    ? Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength).toString()
++                    : String(chunk);
+             processChunk(str);
+             return true;
+         };

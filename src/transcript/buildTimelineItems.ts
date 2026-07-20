@@ -1,0 +1,83 @@
+import type {SessionEvent} from "../sessions/index.js";
+import type {TimelineItem} from "./TimelineItem.js";
+
+export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
+  const items: TimelineItem[] = [];
+  for (const event of events) {
+    if (event.type === "user_message") {
+      items.push({id: event.id, kind: "user", content: event.content});
+      continue;
+    }
+    if (event.type === "process_error") {
+      items.push({
+        id: `${event.timestamp}-${event.source}`,
+        kind: "error",
+        content: event.message
+      });
+      continue;
+    }
+    if (event.type === "model_changed") {
+      items.push({
+        id: `${event.timestamp}-model`,
+        kind: "tool",
+        content: `model → ${event.model}`,
+        ok: true
+      });
+      continue;
+    }
+    if (event.type === "playwright_finished") {
+      items.push({
+        id: event.result.request.id,
+        kind: "tool",
+        content: event.result.request.command,
+        detail: `${event.result.durationMs}ms`,
+        ok: event.result.ok
+      });
+      continue;
+    }
+    if (event.type !== "agent_message") continue;
+    if (event.message.type === "status") {
+      items.push({
+        id: `${event.timestamp}-status`,
+        kind: "tool",
+        content: event.message.message,
+        ok: true
+      });
+      continue;
+    }
+    if (event.message.type === "error") {
+      items.push({
+        id: `${event.timestamp}-agent-error`,
+        kind: "error",
+        content: event.message.message
+      });
+      continue;
+    }
+    if (event.message.type === "assistant_delta") {
+      const previous = items.at(-1);
+      if (previous?.id === event.message.id && previous.kind === "agent") {
+        previous.content += event.message.delta;
+      } else {
+        items.push({
+          id: event.message.id,
+          kind: "agent",
+          content: event.message.delta
+        });
+      }
+      continue;
+    }
+    if (event.message.type === "assistant_message") {
+      const previous = items.at(-1);
+      if (previous?.id === event.message.id && previous.kind === "agent") {
+        previous.content = event.message.content;
+      } else {
+        items.push({
+          id: event.message.id,
+          kind: "agent",
+          content: event.message.content
+        });
+      }
+    }
+  }
+  return items;
+}

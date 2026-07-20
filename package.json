@@ -1,0 +1,71 @@
+{
+  "name": "parterre",
+  "version": "0.1.0",
+  "description": "A model-agnostic browser agent with an embedded terminal viewport",
+  "type": "module",
+  "bin": {
+    "parterre": "./bin/parterre.js"
+  },
+  "scripts": {
+    "setup": "bun install --frozen-lockfile && bun run build && bun link && bun ./bin/parterre.js setup",
+    "start": "bun run src/cli.tsx run",
+    "dev": "bun --watch run src/cli.tsx run",
+    "build": "bun run scripts/build.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "test": "bun test",
+    "readme-assets": "FORCE_COLOR=3 bun run scripts/generateReadmeAssets.tsx"
+  },
+  "dependencies": {
+    "@byteland/ink-scroll-bar": "1.0.0",
+    "@playwright/cli": "^0.1.17",
+    "ink": "^7.1.0",
+    "ink-picture": "^2.1.0",
+    "ink-scroll-view": "0.3.7",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.207",
+    "@biomejs/biome": "2.5.3",
+    "@types/bun": "^1.3.14",
+    "@types/react": "^19.2.7",
+    "@github/copilot-sdk": "^1.0.6",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@openai/codex": "^0.144.6",
+    "@openai/codex-sdk": "^0.144.6",
+    "ink-testing-library": "4.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.207",
+    "@github/copilot-sdk": "^1.0.6",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@openai/codex": "^0.144.6",
+    "@openai/codex-sdk": "^0.144.6"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/claude-agent-sdk": {
+      "optional": true
+    },
+    "@github/copilot-sdk": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "@openai/codex": {
+      "optional": true
+    },
+    "@openai/codex-sdk": {
+      "optional": true
+    }
+  },
+  "packageManager": "bun@1.3.14",
+  "license": "MIT",
+  "patchedDependencies": {
+    "ink-picture@2.1.0": "patches/ink-picture@2.1.0.patch"
+  }
+}

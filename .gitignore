@@ -1,0 +1,12 @@
+node_modules/
+.agents/
+.claude/
+package-lock.json
+dist/
+.playwright-tui/
+.playwright-cli/
+coverage/
+*.log
+.agents/
+.claude/
+.playwright/

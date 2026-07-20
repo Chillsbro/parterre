@@ -1,0 +1,210 @@
+import type {McpServer as McpServerType} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type {WebStandardStreamableHTTPServerTransport as TransportType} from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import type {CodexOptions, ThreadEvent, ThreadOptions} from "@openai/codex-sdk";
+import type {
+  AgentFactoryOptions,
+  AgentHandle,
+  AgentToolDefinition
+} from "./AgentProvider.js";
+import {loadAdapterModule} from "./adapterModules.js";
+import {isCodexAuthenticated} from "./isCodexAuthenticated.js";
+
+interface ToolServer {
+  url: string;
+  close(): Promise<void>;
+}
+
+interface CodexThread {
+  runStreamed(
+    prompt: string,
+    options?: {signal?: AbortSignal}
+  ): Promise<{events: AsyncIterable<ThreadEvent>}>;
+}
+
+interface CodexClient {
+  startThread(options: ThreadOptions): CodexThread;
+}
+
+interface CodexAgentDependencies {
+  isAuthenticated(): Promise<boolean>;
+  createClient(options: CodexOptions): CodexClient;
+  startToolServer(tools: AgentToolDefinition[]): Promise<ToolServer>;
+}
+
+function createMcpServer(
+  tools: AgentToolDefinition[],
+  McpServer: typeof McpServerType
+): McpServerType {
+  const server = new McpServer({name: "parterre", version: "0.1.0"});
+  for (const tool of tools) {
+    server.registerTool(
+      tool.name,
+      {description: tool.description, inputSchema: tool.schema},
+      async input => ({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(await tool.handler(input)) ?? "null"
+          }
+        ]
+      })
+    );
+  }
+  return server;
+}
+
+async function startToolServer(
+  tools: AgentToolDefinition[],
+  McpServer: typeof McpServerType,
+  Transport: typeof TransportType
+): Promise<ToolServer> {
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      const mcp = createMcpServer(tools, McpServer);
+      const transport = new Transport({
+        enableJsonResponse: true
+      });
+      await mcp.connect(transport);
+      try {
+        return await transport.handleRequest(request);
+      } finally {
+        await mcp.close();
+      }
+    }
+  });
+  return {
+    url: `http://${server.hostname}:${server.port}/mcp`,
+    async close() {
+      await server.stop(true);
+    }
+  };
+}
+
+async function createDefaultDependencies(): Promise<CodexAgentDependencies> {
+  const [{Codex}, {McpServer}, {WebStandardStreamableHTTPServerTransport}] =
+    await Promise.all([
+      loadAdapterModule<typeof import("@openai/codex-sdk")>(
+        "@openai/codex-sdk"
+      ),
+      loadAdapterModule<
+        typeof import("@modelcontextprotocol/sdk/server/mcp.js")
+      >("@modelcontextprotocol/sdk/server/mcp.js"),
+      loadAdapterModule<
+        typeof import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js")
+      >("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js")
+    ]);
+  return {
+    isAuthenticated: isCodexAuthenticated,
+    createClient: options => new Codex(options),
+    startToolServer: tools =>
+      startToolServer(
+        tools,
+        McpServer,
+        WebStandardStreamableHTTPServerTransport
+      )
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function createCodexAgent(
+  options: AgentFactoryOptions,
+  dependencies?: CodexAgentDependencies
+): Promise<AgentHandle> {
+  const resolvedDependencies =
+    dependencies ?? (await createDefaultDependencies());
+  if (!(await resolvedDependencies.isAuthenticated())) {
+    throw new Error(
+      "Not signed in to Codex. Run `codex login` outside Parterre, then start Parterre again."
+    );
+  }
+
+  const toolServer = await resolvedDependencies.startToolServer(options.tools);
+  let thread: CodexThread;
+  try {
+    const codex = resolvedDependencies.createClient({
+      config: {mcp_servers: {parterre: {url: toolServer.url}}}
+    });
+    thread = codex.startThread({
+      workingDirectory: options.workspace,
+      skipGitRepoCheck: true,
+      sandboxMode: "read-only",
+      approvalPolicy: "never",
+      ...(options.model !== "auto" ? {model: options.model} : {})
+    });
+  } catch (error) {
+    await toolServer.close();
+    throw error;
+  }
+  const abort = new AbortController();
+  let queue: Promise<void> = Promise.resolve();
+  let disconnected = false;
+  let firstTurn = true;
+
+  const run = async (prompt: string): Promise<void> => {
+    const input = firstTurn
+      ? `${options.systemPromptAppend}\n\n${prompt}`
+      : prompt;
+    firstTurn = false;
+    const {events} = await thread.runStreamed(input, {signal: abort.signal});
+    for await (const event of events) {
+      const timestamp = new Date().toISOString();
+      if (
+        event.type === "item.completed" &&
+        event.item.type === "agent_message"
+      ) {
+        options.handlers.onAssistantMessage(
+          event.item.id,
+          event.item.text,
+          timestamp
+        );
+      } else if (event.type === "turn.failed") {
+        throw new Error(event.error.message);
+      } else if (event.type === "error") {
+        throw new Error(event.message);
+      }
+    }
+  };
+
+  const enqueue = (prompt: string): Promise<void> => {
+    if (disconnected) return Promise.reject(new Error("Agent is disconnected"));
+    const turn = queue.then(() => run(prompt));
+    queue = turn.catch(() => {});
+    return turn;
+  };
+
+  return {
+    async send(prompt: string): Promise<void> {
+      enqueue(prompt).catch(error => {
+        if (disconnected) return;
+        options.handlers.onSessionError(
+          errorMessage(error),
+          new Date().toISOString()
+        );
+      });
+    },
+    async sendAndWait(prompt: string): Promise<void> {
+      await enqueue(prompt);
+    },
+    async listModels() {
+      return options.model === "auto"
+        ? []
+        : [{id: options.model, name: options.model}];
+    },
+    async setModel() {
+      throw new Error(
+        "Codex model changes require starting a new Parterre session."
+      );
+    },
+    async disconnect(): Promise<void> {
+      disconnected = true;
+      abort.abort();
+      await queue;
+      await toolServer.close();
+    }
+  };
+}
