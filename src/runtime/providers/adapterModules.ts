@@ -1,23 +1,27 @@
-import {createRequire} from "node:module";
 import {homedir} from "node:os";
 import {join, resolve} from "node:path";
-import {pathToFileURL} from "node:url";
+import {fileURLToPath, pathToFileURL} from "node:url";
 
 export function getAdapterRoot(): string {
   return join(homedir(), ".parterre", "adapters");
 }
 
-function getAdapterRequire() {
-  return createRequire(resolve(getAdapterRoot(), "package.json"));
+function resolveAdapterModuleUrl(specifier: string, root: string): string {
+  const parentUrl = pathToFileURL(resolve(root, "resolver.js")).href;
+  return import.meta.resolve(specifier, parentUrl);
 }
 
-export async function loadAdapterModule<T>(specifier: string): Promise<T> {
-  const require = getAdapterRequire();
-  const moduleUrl = pathToFileURL(require.resolve(specifier)).href;
+export async function loadAdapterModule<T>(
+  specifier: string,
+  root = getAdapterRoot()
+): Promise<T> {
+  const moduleUrl = resolveAdapterModuleUrl(specifier, root);
   return import(moduleUrl) as Promise<T>;
 }
 
-export function resolveAdapterModule(specifier: string): string {
-  const require = getAdapterRequire();
-  return require.resolve(specifier);
+export function resolveAdapterModule(
+  specifier: string,
+  root = getAdapterRoot()
+): string {
+  return fileURLToPath(resolveAdapterModuleUrl(specifier, root));
 }

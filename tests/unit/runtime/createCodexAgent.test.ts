@@ -97,7 +97,12 @@ test("runs Codex with Parterre tools and existing authentication", async () => {
   expect(harness.clientOptions).toEqual([
     {
       config: {
-        mcp_servers: {parterre: {url: "http://127.0.0.1:1234/mcp"}}
+        mcp_servers: {
+          parterre: {
+            url: "http://127.0.0.1:1234/mcp",
+            default_tools_approval_mode: "approve"
+          }
+        }
       }
     }
   ]);
