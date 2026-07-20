@@ -127,7 +127,14 @@ export async function createCodexAgent(
   let thread: CodexThread;
   try {
     const codex = resolvedDependencies.createClient({
-      config: {mcp_servers: {parterre: {url: toolServer.url}}}
+      config: {
+        mcp_servers: {
+          parterre: {
+            url: toolServer.url,
+            default_tools_approval_mode: "approve"
+          }
+        }
+      }
     });
     thread = codex.startThread({
       workingDirectory: options.workspace,
