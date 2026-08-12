@@ -148,7 +148,7 @@ export async function createClaudeAgent(
   const interruptClaude = async (): Promise<void> => {
     const messageUuid = currentTurnMessageUuid;
     const receipt = await agentQuery.interrupt();
-    if (!messageUuid || !receipt?.still_queued.includes(messageUuid)) return;
+    if (!messageUuid || !receipt?.still_queued?.includes(messageUuid)) return;
     const queryWithCancellation = agentQuery as typeof agentQuery & {
       cancelAsyncMessage(uuid: string): Promise<boolean>;
     };
