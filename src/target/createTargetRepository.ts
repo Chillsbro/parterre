@@ -250,7 +250,8 @@ async function run(command: string[], root: string) {
   const child = Bun.spawn({
     cmd: command,
     cwd: root,
-    env: process.env,
+    env: {...Bun.env},
+    stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe"
   });
