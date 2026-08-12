@@ -10,6 +10,7 @@ import {
   resolveAgentFactory
 } from "../providers/index.js";
 import {
+  createMaterializeTargetTestTool,
   createPlaywrightTool,
   createQueryCodebaseProfileTool,
   createReadCodebaseTool,
@@ -43,6 +44,7 @@ export async function startRuntimeAgent(
       baseUrl: context.config.baseUrl,
       tools: [
         createPlaywrightTool(runner),
+        createMaterializeTargetTestTool(context),
         createReadCodebaseTool(context),
         createSaveCodebaseProfileTool(context),
         createQueryCodebaseProfileTool(context)

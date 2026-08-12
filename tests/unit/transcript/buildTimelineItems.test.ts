@@ -75,6 +75,39 @@ test("adds a filesystem link after a video recording finishes", () => {
   ]);
 });
 
+test("links a materialized target test with its conventional exit code", () => {
+  const items = buildTimelineItems([
+    {
+      type: "target_test_finished",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      result: {
+        ok: true,
+        passed: true,
+        path: "/tmp/target/tests/checkout.test.ts",
+        command: ["bun", "run", "test"],
+        exitCode: 0,
+        timedOut: false,
+        stdout: "pass",
+        stderr: ""
+      }
+    }
+  ]);
+
+  expect(items).toEqual([
+    {
+      id: "2026-01-01T00:00:00.000Z-target-test",
+      kind: "tool",
+      content: "Automation test written — view ",
+      detail: "exit 0",
+      link: {
+        label: "/tmp/target/tests/checkout.test.ts",
+        href: "file:///tmp/target/tests/checkout.test.ts"
+      },
+      ok: true
+    }
+  ]);
+});
+
 test("formats timeline items as replay lines", () => {
   expect(formatTimelineItem({id: "1", kind: "user", content: "hi"})).toBe(
     "You: hi"

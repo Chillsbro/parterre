@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        area: [browser, sessions, provider, learn, pty]
+        area: [browser, sessions, provider, learn, target, pty]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
