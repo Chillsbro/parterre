@@ -165,7 +165,7 @@ test("reports installer metadata before the source package version", async () =>
   } finally {
     await rm(root, {recursive: true, force: true});
   }
-  expect(await getParterreVersion([])).toBe("v0.1.1");
+  expect(await getParterreVersion([])).toBe("v0.2.0");
 });
 
 test("discovers metadata only for an installer-managed release", async () => {
