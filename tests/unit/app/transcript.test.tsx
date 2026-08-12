@@ -165,6 +165,29 @@ test("renders short transcripts without hiding anything", () => {
   expect(output).not.toContain("hidden");
 });
 
+test("renders video filesystem links as terminal hyperlinks", () => {
+  const output = renderToString(
+    <Transcript
+      items={[
+        {
+          id: "video",
+          kind: "tool",
+          content: "Video recorded — view ",
+          link: {
+            label: "here",
+            href: "file:///tmp/recording.webm"
+          },
+          ok: true
+        }
+      ]}
+      height={12}
+    />,
+    {columns: 44}
+  );
+  expect(output).toContain("Video recorded — view ");
+  expect(output).toContain("\u001B]8;;file:///tmp/recording.webm\u0007here");
+});
+
 test("compacts unusually spaced user content after submission", () => {
   const content = `const value = 1;\n\n${" ".repeat(80)}return value;`;
   const output = renderToString(

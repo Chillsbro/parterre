@@ -9,7 +9,7 @@ export function createPlaywrightTool(
   return {
     name: "playwright_cli",
     description:
-      "Control the embedded browser with an allowlisted Playwright CLI command. Use this for every browser interaction so the user can watch the page inside Parterre.",
+      "Control the embedded browser with an allowlisted Playwright CLI command, including video-start and video-stop for recordings. Use this for every browser interaction so the user can watch the page inside Parterre.",
     schema: {
       command: z
         .string()

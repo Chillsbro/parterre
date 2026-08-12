@@ -10,6 +10,10 @@ import {
   shouldCompactComposer
 } from "../Composer/Composer.js";
 
+function formatTerminalHyperlink(link: {label: string; href: string}): string {
+  return `\u001B]8;;${link.href}\u0007${link.label}\u001B]8;;\u0007`;
+}
+
 function EmptyState(): React.ReactElement {
   return (
     <Box
@@ -137,6 +141,11 @@ export function Transcript(props: {
                           <Text
                             color={parterreTheme.faint}
                           >{`  ${item.detail}`}</Text>
+                        ) : null}
+                        {item.link ? (
+                          <Text color={parterreTheme.accentBright} underline>
+                            {formatTerminalHyperlink(item.link)}
+                          </Text>
                         ) : null}
                       </Text>
                     </Box>

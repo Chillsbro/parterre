@@ -113,8 +113,9 @@ the agent only receives an allowlisted Playwright interface.
 
 Every session is persisted in a local SQLite database at
 `~/.parterre/sessions/parterre.db`: metadata, the full event log, and learned
-codebase profiles. Screenshots, snapshots, traces, and logs sit next to it on
-disk.
+codebase profiles. Screenshots, snapshots, traces, recorded videos, and logs
+sit next to it on disk. When an agent finishes a video recording, the
+transcript includes a clickable `view here` link to the WebM file.
 
 ```sh
 parterre sessions             # list

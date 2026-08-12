@@ -1,3 +1,5 @@
+import {extname} from "node:path";
+import {pathToFileURL} from "node:url";
 import type {SessionEvent} from "../sessions/index.js";
 import type {TimelineItem} from "./TimelineItem.js";
 
@@ -33,6 +35,16 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
         detail: `${event.result.durationMs}ms`,
         ok: event.result.ok
       });
+      for (const artifact of event.result.artifacts) {
+        if (extname(artifact).toLowerCase() !== ".webm") continue;
+        items.push({
+          id: `${event.result.request.id}-${artifact}`,
+          kind: "tool",
+          content: "Video recorded — view ",
+          link: {label: "here", href: pathToFileURL(artifact).href},
+          ok: true
+        });
+      }
       continue;
     }
     if (event.type !== "agent_message") continue;

@@ -6,7 +6,12 @@ import {
   getLogPath,
   type PlaywrightResult
 } from "../../sessions/index.js";
-import {getArtifactKind, getRequestedArtifactPath} from "../artifacts/index.js";
+import {
+  getArtifactKind,
+  getManagedVideoStartArgs,
+  getRecordedVideoArtifactPaths,
+  getRequestedArtifactPath
+} from "../artifacts/index.js";
 import {getBrowserCommandDescriptor} from "../commands/index.js";
 import {writeBrowserCompatibilityConfig} from "../configuring/index.js";
 import {parsePlaywrightOutput} from "../output/index.js";
@@ -20,6 +25,7 @@ export async function executePlaywrightRequest(options: {
   storageDir: string;
   sessionId: string;
   request: PlaywrightRequest;
+  videoRecordingPath?: string;
 }): Promise<PlaywrightResult> {
   const {request} = options;
   if (!getBrowserCommandDescriptor(request.command)) {
@@ -34,13 +40,22 @@ export async function executePlaywrightRequest(options: {
           sessionId: options.sessionId
         })
       : undefined;
-  const requestedArtifactPath = getRequestedArtifactPath(
-    options.storageDir,
-    options.sessionId,
-    request
-  );
-  if (requestedArtifactPath)
-    commandArgs.push(`--filename=${requestedArtifactPath}`);
+  const requestedArtifactPath =
+    (request.command === "video-start"
+      ? options.videoRecordingPath
+      : undefined) ??
+    getRequestedArtifactPath(options.storageDir, options.sessionId, request);
+  if (requestedArtifactPath) {
+    if (request.command === "video-start") {
+      commandArgs.splice(
+        0,
+        commandArgs.length,
+        ...getManagedVideoStartArgs(commandArgs, requestedArtifactPath)
+      );
+    } else {
+      commandArgs.push(`--filename=${requestedArtifactPath}`);
+    }
+  }
 
   const processResult = await runProcess(
     options.command,
@@ -61,6 +76,13 @@ export async function executePlaywrightRequest(options: {
     .trim();
   const parsedOutput = parsePlaywrightOutput(output, options.workspace);
   const sourceArtifacts = new Set(parsedOutput.artifacts);
+  if (request.command === "video-stop" && options.videoRecordingPath) {
+    for (const path of await getRecordedVideoArtifactPaths(
+      options.videoRecordingPath
+    )) {
+      sourceArtifacts.add(path);
+    }
+  }
   if (
     requestedArtifactPath &&
     (await Bun.file(requestedArtifactPath).exists())

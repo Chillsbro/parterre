@@ -31,5 +31,13 @@ export function getRequestedArtifactPath(
       `${timestamp}-${request.id}.pdf`
     );
   }
+  if (request.command === "video-start") {
+    return getArtifactPath(
+      storageDir,
+      sessionId,
+      "videos",
+      `${timestamp}-${request.id}.webm`
+    );
+  }
   return undefined;
 }
