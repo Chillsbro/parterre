@@ -2,7 +2,15 @@ import {ScrollBarBox} from "@byteland/ink-scroll-bar";
 import {Box, Text} from "ink";
 import {ScrollView, type ScrollViewRef} from "ink-scroll-view";
 import type React from "react";
-import {type Ref, useImperativeHandle, useRef, useState} from "react";
+import {
+  type Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import {formatTerminalHyperlink} from "../../terminal/formatTerminalHyperlink.js";
 import {parterreTheme} from "../../theme/index.js";
 import type {TimelineItem} from "../../transcript/index.js";
@@ -44,6 +52,82 @@ export function Transcript(props: {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const renderedItems = useMemo(
+    () =>
+      props.items.map(item => {
+        if (item.kind === "user") {
+          return (
+            <Box key={item.id} paddingTop={1}>
+              <Box flexShrink={0}>
+                <Text color={parterreTheme.accentBright}>❯ </Text>
+              </Box>
+              <Text bold color={parterreTheme.text} wrap="wrap">
+                {shouldCompactComposer(item.content)
+                  ? compactContentLabel(item.content)
+                  : item.content}
+              </Text>
+            </Box>
+          );
+        }
+        if (item.kind === "tool") {
+          return (
+            <Box key={item.id} paddingLeft={2}>
+              <Box flexShrink={0}>
+                <Text
+                  color={item.ok ? parterreTheme.faint : parterreTheme.error}
+                >
+                  {item.ok ? "· " : "✗ "}
+                </Text>
+              </Box>
+              <Text color={parterreTheme.muted} wrap="truncate-end">
+                {item.content}
+                {item.detail ? (
+                  <Text color={parterreTheme.faint}>{`  ${item.detail}`}</Text>
+                ) : null}
+                {item.link ? (
+                  <Text color={parterreTheme.accentBright} underline>
+                    {formatTerminalHyperlink(item.link)}
+                  </Text>
+                ) : null}
+              </Text>
+            </Box>
+          );
+        }
+        if (item.kind === "error") {
+          return (
+            <Box key={item.id} paddingTop={1}>
+              <Text color={parterreTheme.error} wrap="wrap">
+                ✗ {item.content}
+              </Text>
+            </Box>
+          );
+        }
+        return (
+          <Box key={item.id} paddingTop={1} paddingLeft={1}>
+            <Text color={parterreTheme.text} wrap="wrap">
+              {item.content}
+            </Text>
+          </Box>
+        );
+      }),
+    [props.items]
+  );
+  const handleViewportSizeChange = useCallback(
+    (size: {width: number; height: number}): void => {
+      setViewportHeight(current =>
+        current === size.height ? current : size.height
+      );
+    },
+    []
+  );
+  const handleContentHeightChange = useCallback((height: number): void => {
+    setContentHeight(current => (current === height ? current : height));
+  }, []);
+  useEffect(() => {
+    if (pinnedRef.current && contentHeight > 0) {
+      innerRef.current?.scrollToBottom();
+    }
+  }, [contentHeight]);
   const overflowing = viewportHeight > 0 && contentHeight > viewportHeight;
   const safeViewportHeight = Math.max(
     1,
@@ -99,72 +183,10 @@ export function Transcript(props: {
               ref={innerRef}
               flexGrow={1}
               onScroll={setScrollOffset}
-              onViewportSizeChange={size => setViewportHeight(size.height)}
-              onContentHeightChange={height => {
-                setContentHeight(height);
-                if (pinnedRef.current) innerRef.current?.scrollToBottom();
-              }}
+              onViewportSizeChange={handleViewportSizeChange}
+              onContentHeightChange={handleContentHeightChange}
             >
-              {props.items.map(item => {
-                if (item.kind === "user") {
-                  return (
-                    <Box key={item.id} paddingTop={1}>
-                      <Box flexShrink={0}>
-                        <Text color={parterreTheme.accentBright}>❯ </Text>
-                      </Box>
-                      <Text bold color={parterreTheme.text} wrap="wrap">
-                        {shouldCompactComposer(item.content)
-                          ? compactContentLabel(item.content)
-                          : item.content}
-                      </Text>
-                    </Box>
-                  );
-                }
-                if (item.kind === "tool") {
-                  return (
-                    <Box key={item.id} paddingLeft={2}>
-                      <Box flexShrink={0}>
-                        <Text
-                          color={
-                            item.ok ? parterreTheme.faint : parterreTheme.error
-                          }
-                        >
-                          {item.ok ? "· " : "✗ "}
-                        </Text>
-                      </Box>
-                      <Text color={parterreTheme.muted} wrap="truncate-end">
-                        {item.content}
-                        {item.detail ? (
-                          <Text
-                            color={parterreTheme.faint}
-                          >{`  ${item.detail}`}</Text>
-                        ) : null}
-                        {item.link ? (
-                          <Text color={parterreTheme.accentBright} underline>
-                            {formatTerminalHyperlink(item.link)}
-                          </Text>
-                        ) : null}
-                      </Text>
-                    </Box>
-                  );
-                }
-                if (item.kind === "error") {
-                  return (
-                    <Box key={item.id} paddingTop={1}>
-                      <Text color={parterreTheme.error} wrap="wrap">
-                        ✗ {item.content}
-                      </Text>
-                    </Box>
-                  );
-                }
-                return (
-                  <Box key={item.id} paddingTop={1} paddingLeft={1}>
-                    <Text color={parterreTheme.text} wrap="wrap">
-                      {item.content}
-                    </Text>
-                  </Box>
-                );
-              })}
+              {renderedItems}
             </ScrollView>
           )}
         </Box>
