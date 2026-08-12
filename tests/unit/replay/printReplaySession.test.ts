@@ -5,7 +5,7 @@ import type {SessionEvent} from "../../../src/sessions/index.js";
 function assistantEvents(count: number): SessionEvent[] {
   return Array.from({length: count}, (_, index) => ({
     type: "agent_message" as const,
-    timestamp: `2026-01-01T00:00:${String(index).padStart(2, "0")}.000Z`,
+    timestamp: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
     message: {
       type: "assistant_message" as const,
       id: `search-${index}`,
