@@ -17,7 +17,7 @@ import type {TimelineItem} from "../../transcript/index.js";
 import {
   compactContentLabel,
   shouldCompactComposer
-} from "../Composer/Composer.js";
+} from "../Composer/computeComposerLayout.js";
 
 function EmptyState(): React.ReactElement {
   return (

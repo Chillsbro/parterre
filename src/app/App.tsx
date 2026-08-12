@@ -93,7 +93,8 @@ export function App(props: {
     hasActivity: Boolean(activity),
     commandMatchCount: commandMatches.length,
     modelPickerCount: modelPicker?.models.length,
-    pendingApproval: Boolean(state.pendingApproval)
+    pendingApproval: Boolean(state.pendingApproval),
+    composerInput: state.input
   });
 
   useEffect(() => {
@@ -182,7 +183,12 @@ export function App(props: {
                   </Text>
                 </Box>
               ) : null}
-              {layout.showActionBar ? <ActionBar input={state.input} /> : null}
+              {layout.showActionBar ? (
+                <ActionBar
+                  input={state.input}
+                  maxHeight={layout.actionBarHeight}
+                />
+              ) : null}
               {modelPicker ? (
                 <ModelPicker
                   models={modelPicker.models}
@@ -198,6 +204,8 @@ export function App(props: {
               ) : (
                 <Composer
                   input={state.input}
+                  height={layout.composerHeight}
+                  compact={layout.compactComposer}
                   disabled={state.status !== "running"}
                   onChange={input => dispatch({type: "input", input})}
                   onSubmit={sendMessage}

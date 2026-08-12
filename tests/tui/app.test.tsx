@@ -103,6 +103,22 @@ test("keeps oddly spaced pasted code compact and submits it unchanged", async ()
   app.unmount();
 });
 
+test("expands the composer as typed text wraps", async () => {
+  const runtime = createScriptedRuntime();
+  const app = renderApp(runtime);
+  await app.ready();
+  const draft = "expandme".repeat(13);
+
+  app.stdin.write(draft);
+  await waitFor(() => app.frame().includes("expandme"));
+
+  const frame = Bun.stripANSI(app.frame());
+  const draftRows = frame.split("\n").filter(line => line.includes("expandme"));
+  expect(draftRows.length).toBeGreaterThan(1);
+  expect(frame.split("\n")).toHaveLength(24);
+  app.unmount();
+});
+
 test("narrows the command menu while typing a slash command", async () => {
   const runtime = createScriptedRuntime();
   const app = renderApp(runtime);
