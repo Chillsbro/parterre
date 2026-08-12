@@ -171,7 +171,9 @@ test("keeps a bounded 300-search transcript scrollable", async () => {
     },
     {
       type: "playwright_finished" as const,
-      timestamp: `2026-01-01T00:00:${index}.001Z`,
+      timestamp: new Date(
+        Date.UTC(2026, 0, 1, 0, 0, 0) + index * 1000 + 1
+      ).toISOString(),
       result: {
         request: {id: `search-${index}`, command: "find", args: []},
         ok: true,
