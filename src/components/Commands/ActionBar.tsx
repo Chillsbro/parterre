@@ -3,13 +3,21 @@ import type React from "react";
 import {matchSlashCommands, maxSlashCommandRows} from "../../commands/index.js";
 import {parterreTheme} from "../../theme/index.js";
 
-export function ActionBar(props: {input: string}): React.ReactElement {
+export function ActionBar(props: {
+  input: string;
+  maxHeight?: number;
+}): React.ReactElement {
   const activeCommand = props.input
     .trimStart()
     .split(/\s/, 1)[0]
     ?.toLowerCase();
   const matches = matchSlashCommands(props.input);
-  const visible = matches.slice(0, maxSlashCommandRows);
+  const maxHeight = props.maxHeight ?? maxSlashCommandRows + 1;
+  const showOverflow = matches.length > maxHeight;
+  const visible = matches.slice(
+    0,
+    Math.min(maxSlashCommandRows, maxHeight - (showOverflow ? 1 : 0))
+  );
   return (
     <Box flexDirection="column" paddingX={1}>
       {visible.map(item => {
@@ -28,9 +36,7 @@ export function ActionBar(props: {input: string}): React.ReactElement {
           </Box>
         );
       })}
-      {matches.length > visible.length ? (
-        <Text color={parterreTheme.faint}>…</Text>
-      ) : null}
+      {showOverflow ? <Text color={parterreTheme.faint}>…</Text> : null}
     </Box>
   );
 }

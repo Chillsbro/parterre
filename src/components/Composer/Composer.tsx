@@ -2,24 +2,7 @@ import {Box, Text, useInput, usePaste} from "ink";
 import TextInput from "ink-text-input";
 import type React from "react";
 import {parterreTheme} from "../../theme/index.js";
-
-const unusuallyWideWhitespace = /[\t ]{16,}/;
-const compactCharacterCount = 400;
-const compactLineCount = 8;
-
-export function shouldCompactComposer(input: string): boolean {
-  const lineCount = input.split(/\r\n|\r|\n/).length;
-  return (
-    input.length >= compactCharacterCount ||
-    lineCount >= compactLineCount ||
-    unusuallyWideWhitespace.test(input)
-  );
-}
-
-export function compactContentLabel(input: string): string {
-  const lineCount = input.split(/\r\n|\r|\n/).length;
-  return `Large input · ${lineCount} ${lineCount === 1 ? "line" : "lines"} · ${input.length} chars`;
-}
+import {compactContentLabel} from "./computeComposerLayout.js";
 
 function CompactInput(props: {
   value: string;
@@ -60,6 +43,8 @@ function CompactInput(props: {
 
 export function Composer(props: {
   input: string;
+  height: number;
+  compact: boolean;
   disabled: boolean;
   onChange: (input: string) => void;
   onSubmit: (input: string) => void;
@@ -70,10 +55,9 @@ export function Composer(props: {
     },
     {isActive: !props.disabled}
   );
-  const compact = shouldCompactComposer(props.input);
   return (
     <Box
-      height={3}
+      height={props.height}
       flexShrink={0}
       overflow="hidden"
       borderStyle="round"
@@ -85,7 +69,7 @@ export function Composer(props: {
       <Text color={props.disabled ? parterreTheme.faint : parterreTheme.accent}>
         ❯{" "}
       </Text>
-      {compact ? (
+      {props.compact ? (
         <CompactInput
           value={props.input}
           disabled={props.disabled}
