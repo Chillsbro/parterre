@@ -26,6 +26,7 @@ export async function executePlaywrightRequest(options: {
   sessionId: string;
   request: PlaywrightRequest;
   videoRecordingPath?: string | undefined;
+  signal?: AbortSignal | undefined;
 }): Promise<PlaywrightResult> {
   const {request} = options;
   if (!getBrowserCommandDescriptor(request.command)) {
@@ -67,7 +68,8 @@ export async function executePlaywrightRequest(options: {
     ],
     {
       cwd: options.workspace,
-      env: {PLAYWRIGHT_MCP_HEADLESS: "true"}
+      env: {PLAYWRIGHT_MCP_HEADLESS: "true"},
+      signal: options.signal
     }
   );
   const output = [processResult.stdout, processResult.stderr]

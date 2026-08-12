@@ -7,6 +7,10 @@ import type {
   AgentToolDefinition
 } from "./AgentProvider.js";
 import {loadAdapterModule} from "./adapterModules.js";
+import {
+  bindToolsToActiveTurn,
+  createAgentTurnQueue
+} from "./createAgentTurnQueue.js";
 import {isCodexAuthenticated} from "./isCodexAuthenticated.js";
 
 interface ToolServer {
@@ -123,7 +127,10 @@ export async function createCodexAgent(
     );
   }
 
-  const toolServer = await resolvedDependencies.startToolServer(options.tools);
+  const turns = createAgentTurnQueue();
+  const toolServer = await resolvedDependencies.startToolServer(
+    bindToolsToActiveTurn(options.tools, turns)
+  );
   let thread: CodexThread;
   try {
     const codex = resolvedDependencies.createClient({
@@ -147,17 +154,14 @@ export async function createCodexAgent(
     await toolServer.close();
     throw error;
   }
-  const abort = new AbortController();
-  let queue: Promise<void> = Promise.resolve();
-  let disconnected = false;
   let firstTurn = true;
 
-  const run = async (prompt: string): Promise<void> => {
+  const run = async (prompt: string, signal: AbortSignal): Promise<void> => {
     const input = firstTurn
       ? `${options.systemPromptAppend}\n\n${prompt}`
       : prompt;
     firstTurn = false;
-    const {events} = await thread.runStreamed(input, {signal: abort.signal});
+    const {events} = await thread.runStreamed(input, {signal});
     for await (const event of events) {
       const timestamp = new Date().toISOString();
       if (
@@ -177,17 +181,12 @@ export async function createCodexAgent(
     }
   };
 
-  const enqueue = (prompt: string): Promise<void> => {
-    if (disconnected) return Promise.reject(new Error("Agent is disconnected"));
-    const turn = queue.then(() => run(prompt));
-    queue = turn.catch(() => {});
-    return turn;
-  };
+  const send = (prompt: string): Promise<void> =>
+    turns.enqueue(signal => run(prompt, signal));
 
   return {
     async send(prompt: string): Promise<void> {
-      enqueue(prompt).catch(error => {
-        if (disconnected) return;
+      await send(prompt).catch(error => {
         options.handlers.onSessionError(
           errorMessage(error),
           new Date().toISOString()
@@ -195,8 +194,9 @@ export async function createCodexAgent(
       });
     },
     async sendAndWait(prompt: string): Promise<void> {
-      await enqueue(prompt);
+      await send(prompt);
     },
+    interrupt: () => turns.interrupt(),
     async listModels() {
       return options.model === "auto"
         ? []
@@ -208,9 +208,7 @@ export async function createCodexAgent(
       );
     },
     async disconnect(): Promise<void> {
-      disconnected = true;
-      abort.abort();
-      await queue;
+      await turns.disconnect();
       await toolServer.close();
     }
   };

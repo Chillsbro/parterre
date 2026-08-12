@@ -6,7 +6,7 @@ export interface AppState {
   status: "starting" | "running" | "stopped" | "failed";
   input: string;
   browserFocused: boolean;
-  awaitingResponse: boolean;
+  activeTurnIds: string[];
   activeRequests: PlaywrightRequest[];
   latestPageUrl: string | undefined;
   latestPageTitle: string | undefined;
@@ -35,7 +35,7 @@ export const initialAppState: AppState = {
   status: "starting",
   input: "",
   browserFocused: false,
-  awaitingResponse: false,
+  activeTurnIds: [],
   activeRequests: [],
   latestPageUrl: undefined,
   latestPageTitle: undefined,

@@ -39,6 +39,25 @@ test("renders agent errors as error items", () => {
   ]);
 });
 
+test("renders an intentional agent interruption as a tool event", () => {
+  const items = buildTimelineItems([
+    {
+      type: "agent_interrupted",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      turnId: "turn-1"
+    }
+  ]);
+
+  expect(items).toEqual([
+    {
+      id: "turn-1-interrupted",
+      kind: "tool",
+      content: "Agent interrupted",
+      ok: true
+    }
+  ]);
+});
+
 test("adds a filesystem link after a video recording finishes", () => {
   const items = buildTimelineItems([
     {

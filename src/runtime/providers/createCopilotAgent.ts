@@ -2,6 +2,10 @@ import type {CopilotClient as CopilotClientType} from "@github/copilot-sdk";
 import {z} from "zod";
 import type {AgentFactoryOptions, AgentHandle} from "./AgentProvider.js";
 import {loadAdapterModule} from "./adapterModules.js";
+import {
+  bindToolsToActiveTurn,
+  createAgentTurnQueue
+} from "./createAgentTurnQueue.js";
 import {isCliStartTimeout} from "./isCliStartTimeout.js";
 
 const maxStartAttempts = 3;
@@ -31,12 +35,19 @@ async function startCopilotClient(
 }
 
 export async function createCopilotAgent(
-  options: AgentFactoryOptions
+  options: AgentFactoryOptions,
+  adapter?: Pick<
+    typeof import("@github/copilot-sdk"),
+    "approveAll" | "CopilotClient" | "defineTool" | "ToolSet"
+  >
 ): Promise<AgentHandle> {
   const {approveAll, CopilotClient, defineTool, ToolSet} =
-    await loadAdapterModule<typeof import("@github/copilot-sdk")>(
+    adapter ??
+    (await loadAdapterModule<typeof import("@github/copilot-sdk")>(
       "@github/copilot-sdk"
-    );
+    ));
+  const turns = createAgentTurnQueue();
+  const tools = bindToolsToActiveTurn(options.tools, turns);
   const client = await startCopilotClient(options.workspace, CopilotClient);
   try {
     const authStatus = await client.getAuthStatus();
@@ -51,16 +62,16 @@ export async function createCopilotAgent(
       sessionId: options.sessionId,
       model: options.model,
       streaming: true,
-      tools: options.tools.map(definition =>
+      tools: tools.map(definition =>
         defineTool(definition.name, {
           description: definition.description,
           parameters: z.object(definition.schema),
           defer: "never",
           skipPermission: true,
-          handler: definition.handler
+          handler: input => definition.handler(input)
         })
       ),
-      availableTools: options.tools.reduce(
+      availableTools: tools.reduce(
         (toolSet, definition) => toolSet.addCustom(definition.name),
         new ToolSet()
       ),
@@ -86,13 +97,17 @@ export async function createCopilotAgent(
       options.handlers.onSessionError(event.data.message, event.timestamp);
     });
 
+    const send = (prompt: string): Promise<void> =>
+      turns.enqueue(() => session.sendAndWait({prompt}).then(() => {}));
+
     return {
       async send(prompt: string): Promise<void> {
-        await session.send({prompt});
+        await send(prompt);
       },
       async sendAndWait(prompt: string): Promise<void> {
-        await session.sendAndWait({prompt});
+        await send(prompt);
       },
+      interrupt: () => turns.interrupt(() => session.abort()),
       async listModels() {
         const models = await client.listModels();
         return models
@@ -110,6 +125,10 @@ export async function createCopilotAgent(
       },
       async disconnect(): Promise<void> {
         const cleanupErrors: unknown[] = [];
+        await turns
+          .interrupt(() => session.abort())
+          .catch(error => cleanupErrors.push(error));
+        await turns.disconnect().catch(error => cleanupErrors.push(error));
         await session.disconnect().catch(error => cleanupErrors.push(error));
         await client.stop().catch(error => cleanupErrors.push(error));
         if (cleanupErrors.length > 0) {

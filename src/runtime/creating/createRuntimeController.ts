@@ -18,24 +18,99 @@ export function createRuntimeController(
   context: RuntimeContext,
   agent: AgentHandle
 ): RuntimeController {
+  interface RuntimeTurn {
+    id: string;
+    agentStarted: boolean;
+    interruptionRequested: boolean;
+    settled: Promise<void>;
+    settle(): void;
+  }
+  const activeTurns: RuntimeTurn[] = [];
   const sendUserMessage = async (
     content: string,
     waitForResponse = false,
     displayContent = content
   ): Promise<void> => {
     const id = randomUUID();
-    await context.publish({
-      type: "user_message",
-      timestamp: new Date().toISOString(),
+    let settle = (): void => {};
+    const turn: RuntimeTurn = {
       id,
-      content: displayContent
-    });
-    if (waitForResponse) await agent.sendAndWait(content);
-    else await agent.send(content);
+      agentStarted: false,
+      interruptionRequested: false,
+      settled: new Promise<void>(resolveSettled => {
+        settle = resolveSettled;
+      }),
+      settle: () => settle()
+    };
+    activeTurns.push(turn);
+    const executeTurn = async (): Promise<void> => {
+      try {
+        await context.publish({
+          type: "user_message",
+          timestamp: new Date().toISOString(),
+          id,
+          content: displayContent
+        });
+        await context.publish({
+          type: "agent_turn_started",
+          timestamp: new Date().toISOString(),
+          turnId: id
+        });
+        if (!turn.interruptionRequested) {
+          turn.agentStarted = true;
+          if (waitForResponse) await agent.sendAndWait(content);
+          else await agent.send(content);
+        }
+      } finally {
+        try {
+          await context.publish({
+            type: turn.interruptionRequested
+              ? "agent_interrupted"
+              : "agent_turn_finished",
+            timestamp: new Date().toISOString(),
+            turnId: id
+          });
+        } finally {
+          const index = activeTurns.indexOf(turn);
+          if (index >= 0) activeTurns.splice(index, 1);
+          turn.settle();
+        }
+      }
+    };
+    const execution = executeTurn();
+    if (waitForResponse) {
+      await execution;
+    } else {
+      void execution.catch(error =>
+        context.publish({
+          type: "process_error",
+          timestamp: new Date().toISOString(),
+          source: "agent",
+          message: error instanceof Error ? error.message : String(error)
+        })
+      );
+    }
   };
 
   return {
     sendUserMessage,
+    async interrupt(): Promise<boolean> {
+      const turn = activeTurns[0];
+      if (!turn || turn.interruptionRequested) return false;
+      turn.interruptionRequested = true;
+      if (turn.agentStarted) {
+        let interrupted: boolean;
+        try {
+          interrupted = await agent.interrupt();
+        } catch (error) {
+          turn.interruptionRequested = false;
+          throw error;
+        }
+        if (!interrupted) turn.interruptionRequested = false;
+      }
+      await turn.settled;
+      return turn.interruptionRequested;
+    },
     async resolveApproval(requestId: string, approved: boolean): Promise<void> {
       await context.approvals.resolve(requestId, approved);
     },

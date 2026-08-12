@@ -106,6 +106,8 @@ Type `/` and the command menu narrows as you type:
 
 Sensitive browser actions pause for approval. Unknown commands are rejected;
 the agent only receives an allowlisted Playwright interface.
+Press `Esc` while the agent is working to interrupt its current turn without
+ending the session.
 
 ## Render quality
 

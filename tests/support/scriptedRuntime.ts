@@ -12,6 +12,7 @@ export interface ScriptedRuntime {
   sentMessages: Array<{content: string; displayContent: string}>;
   approvals: Array<{requestId: string; approved: boolean}>;
   modelChanges: string[];
+  interruptionCount(): number;
   stopped(): boolean;
 }
 
@@ -23,8 +24,18 @@ export function createScriptedRuntime(options?: {
   const modelChanges: string[] = [];
   let notify: ((notification: RuntimeNotification) => void) | undefined;
   let stopped = false;
+  let interruptions = 0;
+  let activeTurnId: string | undefined;
 
   const emit = (event: SessionEvent): void => {
+    if (event.type === "agent_turn_started") activeTurnId = event.turnId;
+    if (
+      (event.type === "agent_turn_finished" ||
+        event.type === "agent_interrupted") &&
+      event.turnId === activeTurnId
+    ) {
+      activeTurnId = undefined;
+    }
     notify?.({type: "event", event});
   };
 
@@ -33,6 +44,7 @@ export function createScriptedRuntime(options?: {
     notify({type: "status", status: "running"});
     return {
       async sendUserMessage(content, _waitForResponse, displayContent) {
+        const turnId = randomUUID();
         sentMessages.push({content, displayContent: displayContent ?? content});
         emit({
           type: "user_message",
@@ -40,7 +52,17 @@ export function createScriptedRuntime(options?: {
           id: randomUUID(),
           content: displayContent ?? content
         });
+        emit({
+          type: "agent_turn_started",
+          timestamp: new Date().toISOString(),
+          turnId
+        });
         for (const event of options?.respond?.(content) ?? []) emit(event);
+        emit({
+          type: "agent_turn_finished",
+          timestamp: new Date().toISOString(),
+          turnId
+        });
       },
       async resolveApproval(requestId, approved) {
         approvals.push({requestId, approved});
@@ -69,6 +91,17 @@ export function createScriptedRuntime(options?: {
       async isWorkspaceProfileStale() {
         return false;
       },
+      async interrupt() {
+        if (!activeTurnId) return false;
+        interruptions += 1;
+        emit({
+          type: "agent_interrupted",
+          timestamp: new Date().toISOString(),
+          turnId: activeTurnId
+        });
+        activeTurnId = undefined;
+        return true;
+      },
       async stop() {
         stopped = true;
         notify?.({type: "status", status: "stopped"});
@@ -82,6 +115,7 @@ export function createScriptedRuntime(options?: {
     sentMessages,
     approvals,
     modelChanges,
+    interruptionCount: () => interruptions,
     stopped: () => stopped
   };
 }

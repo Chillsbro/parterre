@@ -79,6 +79,7 @@ export function App(props: {
     () => buildTimelineItems(state.events),
     [state.events]
   );
+  const agentActive = state.activeTurnIds.length > 0;
   const activity = selectAgentActivity(state, props.config.provider);
   const currentModel = state.currentModel ?? props.config.model;
   const {modelPicker, openModelPicker, handleModelPickerInput} = useModelPicker(
@@ -117,6 +118,10 @@ export function App(props: {
       const scroller = transcriptScrollRef.current;
       if (key.pageUp) scroller?.pageUp();
       else scroller?.pageDown();
+      return;
+    }
+    if (key.escape && agentActive) {
+      void runtimeRef.current?.interrupt().catch(reportHostError);
       return;
     }
     if (handleModelPickerInput(key)) return;
@@ -216,6 +221,7 @@ export function App(props: {
           status={state.status}
           pageUrl={state.latestPageUrl}
           model={currentModel}
+          agentActive={agentActive}
         />
       </Box>
     </GraphicsProvider>
