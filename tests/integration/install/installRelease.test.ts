@@ -3,6 +3,12 @@ import {chmod, mkdir, mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join, resolve} from "node:path";
 
+test("installer delimits variables before non-ASCII text", async () => {
+  const installer = await readFile(resolve("install.sh"), "utf8");
+
+  expect(installer).not.toMatch(/\$[A-Za-z_][A-Za-z0-9_]*\P{ASCII}/u);
+});
+
 test("installer records release metadata used by automatic updates", async () => {
   const root = await mkdtemp(join(tmpdir(), "parterre-installer-"));
   const releaseDir = join(root, "release");
