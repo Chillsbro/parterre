@@ -3,16 +3,13 @@ import {Box, Text} from "ink";
 import {ScrollView, type ScrollViewRef} from "ink-scroll-view";
 import type React from "react";
 import {type Ref, useImperativeHandle, useRef, useState} from "react";
+import {formatTerminalHyperlink} from "../../terminal/formatTerminalHyperlink.js";
 import {parterreTheme} from "../../theme/index.js";
 import type {TimelineItem} from "../../transcript/index.js";
 import {
   compactContentLabel,
   shouldCompactComposer
 } from "../Composer/Composer.js";
-
-function formatTerminalHyperlink(link: {label: string; href: string}): string {
-  return `\u001B]8;;${link.href}\u0007${link.label}\u001B]8;;\u0007`;
-}
 
 function EmptyState(): React.ReactElement {
   return (

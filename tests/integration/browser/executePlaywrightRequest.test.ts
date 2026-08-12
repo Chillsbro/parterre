@@ -6,6 +6,7 @@ import {
   closePlaywrightSession,
   createPlaywrightExecutor,
   executePlaywrightRequest,
+  getRequestedArtifactPath,
   isPlaywrightSessionOpen
 } from "../../../src/playwright/index.js";
 import {
@@ -80,10 +81,18 @@ test("executes an isolated Playwright CLI browser action", async () => {
     expect(screenshotResult.ok).toBe(true);
     expect(screenshotResult.artifacts).toHaveLength(1);
     expect(await Bun.file(screenshotResult.artifacts[0]!).exists()).toBe(true);
-    const videoStartResult = await executor({
+    const videoStartRequest = {
       id: "record-fixture",
       command: "video-start",
       args: ["outside-the-session.webm", "--size", "640x480"]
+    };
+    const videoRecordingPath = getRequestedArtifactPath(
+      storageDir,
+      "session-1",
+      videoStartRequest
+    );
+    const videoStartResult = await executor(videoStartRequest, {
+      videoRecordingPath
     });
     expect(videoStartResult.ok).toBe(true);
     const recordedNavigationResult = await executor({
@@ -92,11 +101,10 @@ test("executes an isolated Playwright CLI browser action", async () => {
       args: [`${fixture.url}/form`]
     });
     expect(recordedNavigationResult.ok).toBe(true);
-    const videoStopResult = await executor({
-      id: "finish-recording",
-      command: "video-stop",
-      args: []
-    });
+    const videoStopResult = await executor(
+      {id: "finish-recording", command: "video-stop", args: []},
+      {videoRecordingPath}
+    );
     expect(videoStopResult.ok).toBe(true);
     const videoArtifacts = videoStopResult.artifacts.filter(artifact =>
       artifact.endsWith(".webm")

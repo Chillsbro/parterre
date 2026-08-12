@@ -1,5 +1,6 @@
 import {expect, test} from "bun:test";
 import type {
+  PlaywrightExecutionOptions,
   PlaywrightExecutor,
   PlaywrightRequest
 } from "../../../src/playwright/index.js";
@@ -57,11 +58,13 @@ function createFakeContext(options?: {
 
 function createFakeExecutor(output = "") {
   const requests: PlaywrightRequest[] = [];
-  const executor: PlaywrightExecutor = async request => {
+  const executionOptions: (PlaywrightExecutionOptions | undefined)[] = [];
+  const executor: PlaywrightExecutor = async (request, options) => {
     requests.push(request);
+    executionOptions.push(options);
     return {request, ok: true, output, artifacts: [], durationMs: 1};
   };
-  return {executor, requests};
+  return {executor, requests, executionOptions};
 }
 
 test("denies unknown commands without executing anything", async () => {
@@ -129,4 +132,25 @@ test("retargets the screencast after tab commands", async () => {
   const runner = createBrowserCommandRunner({context, executor});
   await runner.run({id: "r5", command: "tab-select", args: ["1"]});
   expect(retargets).toEqual(["https://b.example/"]);
+});
+
+test("owns video recording lifecycle state in the browser command runner", async () => {
+  const {context} = createFakeContext();
+  const {executor, requests, executionOptions} = createFakeExecutor();
+  const runner = createBrowserCommandRunner({context, executor});
+
+  await runner.run({id: "record", command: "video-start", args: []});
+  await runner.run({id: "navigate", command: "goto", args: ["https://x.test"]});
+  await runner.run({id: "stop", command: "video-stop", args: []});
+
+  expect(requests.map(request => request.command)).toEqual([
+    "video-start",
+    "goto",
+    "screenshot",
+    "video-stop"
+  ]);
+  const recordingPath = executionOptions[0]?.videoRecordingPath;
+  expect(recordingPath).toStartWith("/storage/session-1/artifacts/videos/");
+  expect(executionOptions[1]?.videoRecordingPath).toBeUndefined();
+  expect(executionOptions[3]?.videoRecordingPath).toBe(recordingPath);
 });

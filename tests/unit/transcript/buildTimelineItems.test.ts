@@ -94,4 +94,15 @@ test("formats timeline items as replay lines", () => {
       ok: false
     })
   ).toBe("ERROR open (12ms)");
+  expect(
+    formatTimelineItem({
+      id: "5",
+      kind: "tool",
+      content: "Video recorded — view ",
+      link: {label: "here", href: "file:///tmp/recording.webm"},
+      ok: true
+    })
+  ).toBe(
+    "OK Video recorded — view \u001B]8;;file:///tmp/recording.webm\u0007here\u001B]8;;\u0007"
+  );
 });

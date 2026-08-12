@@ -25,7 +25,7 @@ export async function executePlaywrightRequest(options: {
   storageDir: string;
   sessionId: string;
   request: PlaywrightRequest;
-  videoRecordingPath?: string;
+  videoRecordingPath?: string | undefined;
 }): Promise<PlaywrightResult> {
   const {request} = options;
   if (!getBrowserCommandDescriptor(request.command)) {
