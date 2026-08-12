@@ -6,6 +6,7 @@ import {
   closePlaywrightSession,
   createPlaywrightExecutor,
   executePlaywrightRequest,
+  getRequestedArtifactPath,
   isPlaywrightSessionOpen
 } from "../../../src/playwright/index.js";
 import {
@@ -80,6 +81,40 @@ test("executes an isolated Playwright CLI browser action", async () => {
     expect(screenshotResult.ok).toBe(true);
     expect(screenshotResult.artifacts).toHaveLength(1);
     expect(await Bun.file(screenshotResult.artifacts[0]!).exists()).toBe(true);
+    const videoStartRequest = {
+      id: "record-fixture",
+      command: "video-start",
+      args: ["outside-the-session.webm", "--size", "640x480"]
+    };
+    const videoRecordingPath = getRequestedArtifactPath(
+      storageDir,
+      "session-1",
+      videoStartRequest
+    );
+    const videoStartResult = await executor(videoStartRequest, {
+      videoRecordingPath
+    });
+    expect(videoStartResult.ok).toBe(true);
+    const recordedNavigationResult = await executor({
+      id: "recorded-navigation",
+      command: "goto",
+      args: [`${fixture.url}/form`]
+    });
+    expect(recordedNavigationResult.ok).toBe(true);
+    const videoStopResult = await executor(
+      {id: "finish-recording", command: "video-stop", args: []},
+      {videoRecordingPath}
+    );
+    expect(videoStopResult.ok).toBe(true);
+    const videoArtifacts = videoStopResult.artifacts.filter(artifact =>
+      artifact.endsWith(".webm")
+    );
+    expect(videoArtifacts).toHaveLength(1);
+    expect(videoArtifacts[0]).not.toContain("outside-the-session");
+    expect(await Bun.file(videoArtifacts[0]!).exists()).toBe(true);
+    expect(
+      (await Bun.file(videoArtifacts[0]!).arrayBuffer()).byteLength
+    ).toBeGreaterThan(0);
     expect(
       await isPlaywrightSessionOpen({command, workspace, playwrightSession})
     ).toBe(true);
@@ -93,4 +128,4 @@ test("executes an isolated Playwright CLI browser action", async () => {
     await rm(storageDir, {recursive: true, force: true});
     fixture.stop();
   }
-});
+}, 60000);

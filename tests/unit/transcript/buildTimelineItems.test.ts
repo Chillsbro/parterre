@@ -39,6 +39,42 @@ test("renders agent errors as error items", () => {
   ]);
 });
 
+test("adds a filesystem link after a video recording finishes", () => {
+  const items = buildTimelineItems([
+    {
+      type: "playwright_finished",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      result: {
+        request: {id: "recording-1", command: "video-stop", args: []},
+        ok: true,
+        output: "- [Video](recording.webm)",
+        artifacts: ["/tmp/parterre recording.webm"],
+        durationMs: 123
+      }
+    }
+  ]);
+
+  expect(items).toEqual([
+    {
+      id: "recording-1",
+      kind: "tool",
+      content: "video-stop",
+      detail: "123ms",
+      ok: true
+    },
+    {
+      id: "recording-1-/tmp/parterre recording.webm",
+      kind: "tool",
+      content: "Video recorded — view ",
+      link: {
+        label: "here",
+        href: "file:///tmp/parterre%20recording.webm"
+      },
+      ok: true
+    }
+  ]);
+});
+
 test("formats timeline items as replay lines", () => {
   expect(formatTimelineItem({id: "1", kind: "user", content: "hi"})).toBe(
     "You: hi"
@@ -58,4 +94,15 @@ test("formats timeline items as replay lines", () => {
       ok: false
     })
   ).toBe("ERROR open (12ms)");
+  expect(
+    formatTimelineItem({
+      id: "5",
+      kind: "tool",
+      content: "Video recorded — view ",
+      link: {label: "here", href: "file:///tmp/recording.webm"},
+      ok: true
+    })
+  ).toBe(
+    "OK Video recorded — view \u001B]8;;file:///tmp/recording.webm\u0007here\u001B]8;;\u0007"
+  );
 });

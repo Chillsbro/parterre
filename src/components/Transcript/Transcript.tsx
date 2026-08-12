@@ -3,6 +3,7 @@ import {Box, Text} from "ink";
 import {ScrollView, type ScrollViewRef} from "ink-scroll-view";
 import type React from "react";
 import {type Ref, useImperativeHandle, useRef, useState} from "react";
+import {formatTerminalHyperlink} from "../../terminal/formatTerminalHyperlink.js";
 import {parterreTheme} from "../../theme/index.js";
 import type {TimelineItem} from "../../transcript/index.js";
 import {
@@ -137,6 +138,11 @@ export function Transcript(props: {
                           <Text
                             color={parterreTheme.faint}
                           >{`  ${item.detail}`}</Text>
+                        ) : null}
+                        {item.link ? (
+                          <Text color={parterreTheme.accentBright} underline>
+                            {formatTerminalHyperlink(item.link)}
+                          </Text>
                         ) : null}
                       </Text>
                     </Box>

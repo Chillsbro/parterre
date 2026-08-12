@@ -10,12 +10,18 @@ export interface PlaywrightSessionOptions {
   sessionId: string;
 }
 
+export interface PlaywrightExecutionOptions {
+  videoRecordingPath?: string | undefined;
+}
+
 export type PlaywrightExecutor = (
-  request: PlaywrightRequest
+  request: PlaywrightRequest,
+  executionOptions?: PlaywrightExecutionOptions
 ) => Promise<PlaywrightResult>;
 
 export function createPlaywrightExecutor(
   options: PlaywrightSessionOptions
 ): PlaywrightExecutor {
-  return request => executePlaywrightRequest({...options, request});
+  return (request, executionOptions) =>
+    executePlaywrightRequest({...options, request, ...executionOptions});
 }

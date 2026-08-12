@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@byteland/ink-scroll-bar": "1.0.0",
-    "@playwright/cli": "^0.1.17",
+    "@playwright/cli": "^0.1.18",
     "ink": "^7.1.0",
     "ink-picture": "^2.1.0",
     "ink-scroll-view": "0.3.7",

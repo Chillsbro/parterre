@@ -1,6 +1,7 @@
 import {
   evaluatePolicy,
   getBrowserCommandDescriptor,
+  getRequestedArtifactPath,
   type PlaywrightExecutor,
   type PlaywrightRequest
 } from "../../playwright/index.js";
@@ -26,6 +27,7 @@ export function createBrowserCommandRunner(options: {
   executor: PlaywrightExecutor;
 }): BrowserCommandRunner {
   const {context, executor} = options;
+  let activeVideoRecordingPath: string | undefined;
 
   const captureFrame = async (
     request: PlaywrightRequest
@@ -59,7 +61,23 @@ export function createBrowserCommandRunner(options: {
       timestamp: new Date().toISOString(),
       request
     });
-    const actionResult = await executor(request);
+    const videoRecordingPath =
+      request.command === "video-start"
+        ? getRequestedArtifactPath(
+            context.config.storageDir,
+            context.sessionId,
+            request
+          )
+        : request.command === "video-stop"
+          ? activeVideoRecordingPath
+          : undefined;
+    const actionResult = await executor(request, {videoRecordingPath});
+    if (actionResult.ok && request.command === "video-start") {
+      activeVideoRecordingPath = videoRecordingPath;
+    }
+    if (actionResult.ok && request.command === "video-stop") {
+      activeVideoRecordingPath = undefined;
+    }
     if (actionResult.ok && descriptor?.opensBrowser) {
       context.state.browserOpened = true;
       await ensureScreencast(context);
