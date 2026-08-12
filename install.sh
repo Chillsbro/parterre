@@ -27,7 +27,7 @@ else
   installed_bun=true
 fi
 
-printf '%s\n' "Downloading Parterre $version…"
+printf '%s\n' "Downloading Parterre ${version}…"
 mkdir -p "$temporary_dir/parterre"
 curl -fsSL "$archive_url" -o "$temporary_dir/parterre.tar.gz"
 tar -xzf "$temporary_dir/parterre.tar.gz" -C "$temporary_dir/parterre"
