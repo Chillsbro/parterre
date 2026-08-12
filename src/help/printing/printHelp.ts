@@ -15,7 +15,7 @@ Run options:
   --provider <name>    Agent: auto, codex, copilot, claude, or openai (default: auto)
   --base-url <url>     OpenAI-compatible endpoint, required with --provider openai
   --model <model>       Model id (default: auto)
-  --workspace <path>   Agent and Playwright working directory
+  --workspace <path>   Target repo for the agent, browser, and generated tests
   --storage <path>     Session storage directory
   --playwright <path>  playwright-cli executable
   --redact <value>     Repeatable value removed from persisted events

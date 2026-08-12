@@ -32,12 +32,12 @@ export const slashCommands = [
     help: [
       {
         usage: "/test <workflow>",
-        description: "Run a browser workflow with evidence"
+        description: "Prove a browser workflow and write its automation"
       }
     ],
     local: false,
     instructions:
-      "Use playwright_cli to execute this browser test workflow. Report concise evidence, failures, and the final state:",
+      "Use playwright_cli to execute this browser test workflow manually. If it passes, query the target repo's learned testing conventions; when no profile exists or it lacks testing detail, inspect its instructions, manifest, and nearby tests with read_codebase. Generate matching automation and call materialize_target_test to write and execute it. Revise only the generated test until its conventional test command exits successfully. Report concise evidence, the written path, command, exit code, failures, and final state:",
     askFallback: "Ask me what workflow to test."
   },
   {

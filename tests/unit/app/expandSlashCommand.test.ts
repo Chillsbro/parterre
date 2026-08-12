@@ -5,8 +5,9 @@ test("expands a test workflow into a playwright_cli prompt", () => {
   const command = expandSlashCommand("/test checkout flow");
   expect(command?.display).toBe("/test checkout flow");
   expect(command?.prompt).toContain(
-    "Use playwright_cli to execute this browser test workflow"
+    "Use playwright_cli to execute this browser test workflow manually"
   );
+  expect(command?.prompt).toContain("materialize_target_test");
   expect(command?.prompt).toContain("checkout flow");
 });
 

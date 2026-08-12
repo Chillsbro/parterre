@@ -12,6 +12,8 @@ Terms that name parterre's seams. Use these words in code, commits, and reviews.
 
 **Browser command** — one agent-initiated Playwright CLI action and its full lifecycle: policy, approval, auto-open, execution, frame capture, screencast bookkeeping, and event publishing. Owned end to end by `src/runtime/browser/` behind `run(request)`; every command's traits (tier, visual change, tab effects, open/close semantics) live in the descriptor table in `src/playwright/commands/`.
 
+**Target repository** — the workspace selected by `--workspace`: the codebase whose browser workflow is under test and where generated automation belongs. `src/target/` owns test-shaped path validation, new-file materialization, conventional test-command discovery, execution, and exit-code verdict behind `materializeTest()`. It never replaces a pre-existing file and may revise only files it created during the current session.
+
 **Executor** — the adapter that turns a Playwright request into a raw result at the browser-command module's internal seam: the real `playwright-cli` subprocess in production, an in-memory fake in tests.
 
 **Approval gate** — the module that owns a sensitive command's approval from request to resolution (`src/runtime/approvals/`): it publishes the approval events and settles the promise it created. The TUI answers approvals through the runtime controller; shutdown abandons them as denials.

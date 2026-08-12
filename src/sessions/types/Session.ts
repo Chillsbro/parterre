@@ -1,4 +1,5 @@
 import type {PlaywrightRequest} from "../../playwright/index.js";
+import type {MaterializeTestResult} from "../../target/index.js";
 
 export type AgentMessage =
   | {type: "assistant_delta"; id: string; delta: string}
@@ -41,6 +42,11 @@ export type SessionEvent =
   | {type: "agent_message"; timestamp: string; message: AgentMessage}
   | {type: "playwright_started"; timestamp: string; request: PlaywrightRequest}
   | {type: "playwright_finished"; timestamp: string; result: PlaywrightResult}
+  | {
+      type: "target_test_finished";
+      timestamp: string;
+      result: MaterializeTestResult;
+    }
   | {
       type: "approval_requested";
       timestamp: string;
