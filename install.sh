@@ -31,6 +31,7 @@ printf '%s\n' "Downloading Parterre $version…"
 mkdir -p "$temporary_dir/parterre"
 curl -fsSL "$archive_url" -o "$temporary_dir/parterre.tar.gz"
 tar -xzf "$temporary_dir/parterre.tar.gz" -C "$temporary_dir/parterre"
+printf '%s\n' "$bin_dir" > "$temporary_dir/parterre/.parterre-bin-dir"
 
 "$bun_executable" install \
   --production \

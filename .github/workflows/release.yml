@@ -23,7 +23,8 @@ jobs:
       - name: Build release archive
         run: |
           mkdir release
-          cp -R bin dist patches package.json bun.lock README.md LICENSE release/
+          cp -R bin dist patches package.json bun.lock README.md LICENSE install.sh release/
+          printf '%s\n' "$GITHUB_REF_NAME" > release/VERSION
           tar -czf parterre.tar.gz -C release .
       - uses: softprops/action-gh-release@v2
         with:

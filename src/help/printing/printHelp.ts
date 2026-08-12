@@ -4,6 +4,7 @@ export function printHelp(): void {
   process.stdout.write(`Parterre
 
 Usage:
+  parterre -v | --v             Print the installed release version
   parterre run [options]
   parterre setup                Choose the agent (Codex, Copilot, Claude, or an API endpoint)
   parterre sessions [--storage <path>]
