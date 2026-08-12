@@ -1,6 +1,7 @@
 import {extname} from "node:path";
 import {pathToFileURL} from "node:url";
 import type {SessionEvent} from "../sessions/index.js";
+import {limitTimelineItems} from "./limitTimelineItems.js";
 import type {TimelineItem} from "./TimelineItem.js";
 
 export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
@@ -91,5 +92,5 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
       }
     }
   }
-  return items;
+  return limitTimelineItems(items);
 }

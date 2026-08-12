@@ -6,7 +6,11 @@ import {
   Transcript,
   type TranscriptScrollHandle
 } from "../../../src/components/index.js";
-import type {TimelineItem} from "../../../src/transcript/index.js";
+import type {SessionEvent} from "../../../src/sessions/index.js";
+import {
+  buildTimelineItems,
+  type TimelineItem
+} from "../../../src/transcript/index.js";
 
 class FakeStdout extends EventEmitter {
   columns = 44;
@@ -150,6 +154,60 @@ test("scrolls by lines and re-pins at the bottom", async () => {
   instance.unmount();
   expect(returned).toContain("step-20");
   expect(returned).not.toContain("step-01");
+});
+
+test("keeps a bounded 300-search transcript scrollable", async () => {
+  const events: SessionEvent[] = Array.from({length: 300}, (_, index) => [
+    {
+      type: "agent_message" as const,
+      timestamp: new Date(
+        Date.UTC(2026, 0, 1, 0, 0, 0) + index * 1000
+      ).toISOString(),
+      message: {
+        type: "assistant_message" as const,
+        id: `narration-${index}`,
+        content: `Checking search result ${index + 1} before continuing.`
+      }
+    },
+    {
+      type: "playwright_finished" as const,
+      timestamp: new Date(
+        Date.UTC(2026, 0, 1, 0, 0, 0) + index * 1000 + 1
+      ).toISOString(),
+      result: {
+        request: {id: `search-${index}`, command: "find", args: []},
+        ok: true,
+        output: "",
+        artifacts: [],
+        durationMs: index + 1
+      }
+    }
+  ]).flat();
+  const items = buildTimelineItems(events);
+  const scrollRef = createRef<TranscriptScrollHandle>();
+  const stdout = new FakeStdout();
+  const instance = render(
+    <Transcript items={items} height={12} scrollRef={scrollRef} />,
+    {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: new FakeStdin() as unknown as NodeJS.ReadStream,
+      debug: true,
+      exitOnCtrlC: false,
+      patchConsole: false
+    }
+  );
+  await new Promise(resolve => setTimeout(resolve, 100));
+  scrollRef.current?.scrollLines(-10_000);
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const oldestVisible = Bun.stripANSI(stdout.frames.at(-1) ?? "");
+  scrollRef.current?.scrollLines(10_000);
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const newestVisible = Bun.stripANSI(stdout.frames.at(-1) ?? "");
+  instance.unmount();
+
+  expect(oldestVisible).toContain("401 earlier transcript entries");
+  expect(oldestVisible).not.toContain("Checking search result 1 ");
+  expect(newestVisible).toContain("Checking search result 300");
 });
 
 test("renders short transcripts without hiding anything", () => {
