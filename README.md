@@ -35,6 +35,14 @@ parterre run
 The installer puts Parterre in `~/.local/share/parterre` and links the command
 into `~/.local/bin`. It installs Bun first when needed. Set
 `PARTERRE_INSTALL_DIR` or `PARTERRE_BIN_DIR` to choose different locations.
+Installer-managed releases check GitHub when launched from an interactive
+terminal. When a newer stable release exists, Parterre asks before updating
+and then resumes the original command. Before installation, Parterre verifies
+the release archive against its GitHub-provided SHA-256 digest and passes the
+verified local file to the installer already on disk; it never executes an
+installer fetched from a mutable tag. Offline checks never block startup.
+Run `parterre -v` or `parterre --v` to print the installed release without an
+update check.
 
 Setup installs only the adapter you choose. If you are already signed in, it
 confirms that immediately:

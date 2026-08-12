@@ -12,9 +12,16 @@ import {
 } from "./sessions/index.js";
 import {runSetupWizard} from "./setup/index.js";
 import {createMouseStdin, probeTerminalGraphics} from "./terminal/index.js";
+import {getParterreVersion, maybeUpdateParterre} from "./updating/index.js";
 
 async function main(): Promise<void> {
-  const command = loadCliCommand(Bun.argv.slice(2));
+  const argv = Bun.argv.slice(2);
+  if (argv.length === 1 && (argv[0] === "-v" || argv[0] === "--v")) {
+    process.stdout.write(`${await getParterreVersion()}\n`);
+    return;
+  }
+  if (await maybeUpdateParterre()) return;
+  const command = loadCliCommand(argv);
   if (command.name === "help") {
     printHelp();
     return;
