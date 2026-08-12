@@ -160,7 +160,9 @@ test("keeps a bounded 300-search transcript scrollable", async () => {
   const events: SessionEvent[] = Array.from({length: 300}, (_, index) => [
     {
       type: "agent_message" as const,
-      timestamp: new Date(Date.UTC(2026, 0, 1, 0, 0, 0) + index * 1000).toISOString(),
+      timestamp: new Date(
+        Date.UTC(2026, 0, 1, 0, 0, 0) + index * 1000
+      ).toISOString(),
       message: {
         type: "assistant_message" as const,
         id: `narration-${index}`,
