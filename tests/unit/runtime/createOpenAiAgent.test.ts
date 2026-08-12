@@ -13,7 +13,7 @@ function sse(events: unknown[]): Response {
   });
 }
 
-function createHarness(completions: Response[]) {
+function createHarness(completions: Array<Response | "wait-for-abort">) {
   const deltas: string[] = [];
   const messages: string[] = [];
   const errors: string[] = [];
@@ -31,6 +31,19 @@ function createHarness(completions: Response[]) {
     completionBodies.push(JSON.parse(String(init?.body)));
     const next = completions.shift();
     if (!next) throw new Error("No scripted completion left");
+    if (next === "wait-for-abort") {
+      return await new Promise<Response>((_resolve, reject) => {
+        if (init?.signal?.aborted) {
+          reject(new DOMException("Interrupted", "AbortError"));
+          return;
+        }
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("Interrupted", "AbortError")),
+          {once: true}
+        );
+      });
+    }
     return next;
   }) as typeof fetch;
   const options: AgentFactoryOptions = {
@@ -146,4 +159,87 @@ test("reports background send failures as session errors", async () => {
   await new Promise(resolve => setTimeout(resolve, 1));
   expect(harness.errors).toHaveLength(1);
   expect(harness.errors[0]).toContain("500");
+});
+
+test("interrupts only the active OpenAI-compatible turn", async () => {
+  const harness = createHarness([
+    sse([{choices: [{delta: {content: "next reply"}}]}])
+  ]);
+  const agent = await createOpenAiAgent(harness.options, harness.fetchImpl);
+  const activeTurn = agent.sendAndWait("keep working");
+
+  expect(await agent.interrupt()).toBe(true);
+  await activeTurn;
+  expect(await agent.interrupt()).toBe(false);
+  expect(harness.errors).toEqual([]);
+
+  await agent.sendAndWait("new task");
+  expect(harness.messages).toEqual(["next reply"]);
+});
+
+test("aborts an OpenAI-compatible request already in flight", async () => {
+  const harness = createHarness(["wait-for-abort"]);
+  const agent = await createOpenAiAgent(harness.options, harness.fetchImpl);
+  const activeTurn = agent.sendAndWait("keep working");
+  while (harness.completionBodies.length === 0) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  expect(await agent.interrupt()).toBe(true);
+  await activeTurn;
+  expect(harness.errors).toEqual([]);
+});
+
+test("rolls back partial tool-call history when interrupted", async () => {
+  const harness = createHarness([
+    sse([
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call-1",
+                  function: {name: "echo", arguments: '{"text":"one"}'}
+                },
+                {
+                  index: 1,
+                  id: "call-2",
+                  function: {name: "echo", arguments: '{"text":"two"}'}
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]),
+    sse([{choices: [{delta: {content: "next reply"}}]}])
+  ]);
+  let toolStarted = false;
+  harness.options.tools[0]!.handler = async (_input, context) => {
+    toolStarted = true;
+    const signal = context?.signal;
+    if (!signal) throw new Error("Expected a turn signal");
+    if (signal.aborted) throw new DOMException("Interrupted", "AbortError");
+    await new Promise<void>((_resolve, reject) => {
+      signal.addEventListener(
+        "abort",
+        () => reject(new DOMException("Interrupted", "AbortError")),
+        {once: true}
+      );
+    });
+  };
+  const agent = await createOpenAiAgent(harness.options, harness.fetchImpl);
+  const activeTurn = agent.sendAndWait("run both tools");
+  while (!toolStarted) await new Promise(resolve => setTimeout(resolve, 0));
+
+  expect(await agent.interrupt()).toBe(true);
+  await activeTurn;
+  await agent.sendAndWait("new task");
+
+  expect(
+    harness.completionBodies[1]?.messages.map(message => message.role)
+  ).toEqual(["system", "user"]);
+  expect(harness.messages).toEqual(["next reply"]);
 });

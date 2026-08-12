@@ -11,12 +11,28 @@ function events(items: ThreadEvent[]): AsyncIterable<ThreadEvent> {
   };
 }
 
-function createHarness(authenticated = true) {
+function waitForAbort(signal: AbortSignal): AsyncIterable<ThreadEvent> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      if (signal.aborted) throw new DOMException("Interrupted", "AbortError");
+      await new Promise<void>((_resolve, reject) => {
+        signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("Interrupted", "AbortError")),
+          {once: true}
+        );
+      });
+    }
+  };
+}
+
+function createHarness(authenticated = true, blockFirstTurn = false) {
   const prompts: string[] = [];
   const messages: string[] = [];
   const clientOptions: unknown[] = [];
   const threadOptions: unknown[] = [];
   let toolServerClosed = false;
+  const turnSignals: AbortSignal[] = [];
   const options: AgentFactoryOptions = {
     sessionId: "session-codex",
     model: "auto",
@@ -37,8 +53,19 @@ function createHarness(authenticated = true) {
         startThread(threadOption: unknown) {
           threadOptions.push(threadOption);
           return {
-            async runStreamed(prompt: string) {
+            async runStreamed(
+              prompt: string,
+              turnOptions?: {signal?: AbortSignal}
+            ) {
               prompts.push(prompt);
+              if (turnOptions?.signal) turnSignals.push(turnOptions.signal);
+              if (
+                blockFirstTurn &&
+                prompt.includes("keep working") &&
+                turnOptions?.signal
+              ) {
+                return {events: waitForAbort(turnOptions.signal)};
+              }
               return {
                 events: events([
                   {
@@ -75,6 +102,7 @@ function createHarness(authenticated = true) {
     messages,
     clientOptions,
     threadOptions,
+    turnSignals,
     toolServerClosed: () => toolServerClosed
   };
 }
@@ -84,6 +112,36 @@ test("rejects an unauthenticated Codex account before starting tools", async () 
   expect(
     createCodexAgent(harness.options, harness.dependencies)
   ).rejects.toThrow("codex login");
+});
+
+test("cancels a queued Codex turn before it starts", async () => {
+  const harness = createHarness(true, true);
+  const agent = await createCodexAgent(harness.options, harness.dependencies);
+  const activeTurn = agent.sendAndWait("keep working");
+
+  expect(await agent.interrupt()).toBe(true);
+  await activeTurn;
+  expect(harness.turnSignals).toHaveLength(0);
+  expect(await agent.interrupt()).toBe(false);
+
+  await agent.sendAndWait("new task");
+  expect(harness.messages).toEqual(["done"]);
+  await agent.disconnect();
+});
+
+test("aborts an in-flight Codex turn and waits for it to settle", async () => {
+  const harness = createHarness(true, true);
+  const agent = await createCodexAgent(harness.options, harness.dependencies);
+  const activeTurn = agent.sendAndWait("keep working");
+  while (harness.turnSignals.length === 0) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  expect(await agent.interrupt()).toBe(true);
+  await activeTurn;
+  expect(harness.turnSignals[0]?.aborted).toBe(true);
+  expect(await agent.interrupt()).toBe(false);
+  await agent.disconnect();
 });
 
 test("runs Codex with Parterre tools and existing authentication", async () => {

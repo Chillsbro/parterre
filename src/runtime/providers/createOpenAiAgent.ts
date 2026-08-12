@@ -2,6 +2,7 @@ import {randomUUID} from "node:crypto";
 import {z} from "zod";
 import type {ModelChoice} from "../types/index.js";
 import type {AgentFactoryOptions, AgentHandle} from "./AgentProvider.js";
+import {createAgentTurnQueue} from "./createAgentTurnQueue.js";
 
 const maxToolIterations = 32;
 
@@ -112,6 +113,7 @@ export async function createOpenAiAgent(
     ...(apiKey ? {authorization: `Bearer ${apiKey}`} : {})
   };
   const abort = new AbortController();
+  const turns = createAgentTurnQueue();
   const tools = new Map(
     options.tools.map(definition => [
       definition.name,
@@ -132,9 +134,6 @@ export async function createOpenAiAgent(
   const history: ChatMessage[] = [
     {role: "system", content: buildSystemPrompt(options.systemPromptAppend)}
   ];
-  let queue: Promise<void> = Promise.resolve();
-  let disconnected = false;
-
   const listModels = async (): Promise<ModelChoice[]> => {
     const response = await fetchImpl(`${baseUrl}/models`, {
       headers,
@@ -158,12 +157,13 @@ export async function createOpenAiAgent(
   }
 
   const requestCompletion = async (
-    turnId: string
+    turnId: string,
+    signal: AbortSignal
   ): Promise<{content: string; toolCalls: ToolCallDraft[]}> => {
     const response = await fetchImpl(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers,
-      signal: abort.signal,
+      signal,
       body: JSON.stringify({
         model,
         messages: history,
@@ -186,7 +186,10 @@ export async function createOpenAiAgent(
     });
   };
 
-  const executeToolCall = async (call: ToolCallDraft): Promise<string> => {
+  const executeToolCall = async (
+    call: ToolCallDraft,
+    signal: AbortSignal
+  ): Promise<string> => {
     const tool = tools.get(call.name);
     if (!tool)
       return JSON.stringify({ok: false, error: `Unknown tool: ${call.name}`});
@@ -204,7 +207,9 @@ export async function createOpenAiAgent(
       });
     }
     try {
-      return JSON.stringify((await tool.handler(validated.data)) ?? {ok: true});
+      return JSON.stringify(
+        (await tool.handler(validated.data, {signal})) ?? {ok: true}
+      );
     } catch (error) {
       return JSON.stringify({
         ok: false,
@@ -213,10 +218,11 @@ export async function createOpenAiAgent(
     }
   };
 
-  const runTurn = async (): Promise<void> => {
+  const runTurn = async (signal: AbortSignal): Promise<void> => {
     for (let iteration = 0; iteration < maxToolIterations; iteration += 1) {
+      signal.throwIfAborted();
       const turnId = randomUUID();
-      const completion = await requestCompletion(turnId);
+      const completion = await requestCompletion(turnId, signal);
       if (completion.toolCalls.length === 0) {
         history.push({role: "assistant", content: completion.content});
         options.handlers.onAssistantMessage(
@@ -236,11 +242,13 @@ export async function createOpenAiAgent(
         }))
       });
       for (const call of completion.toolCalls) {
+        signal.throwIfAborted();
         history.push({
           role: "tool",
           tool_call_id: call.id,
-          content: await executeToolCall(call)
+          content: await executeToolCall(call, signal)
         });
+        signal.throwIfAborted();
       }
     }
     options.handlers.onAssistantMessage(
@@ -250,19 +258,20 @@ export async function createOpenAiAgent(
     );
   };
 
-  const enqueue = (prompt: string): Promise<void> => {
-    if (disconnected) return Promise.reject(new Error("Agent is disconnected"));
-    const turn = queue.then(() => {
-      history.push({role: "user", content: prompt});
-      return runTurn();
+  const enqueue = (prompt: string): Promise<void> =>
+    turns.enqueue(async signal => {
+      const historyCheckpoint = history.length;
+      try {
+        history.push({role: "user", content: prompt});
+        await runTurn(signal);
+      } finally {
+        if (signal.aborted) history.splice(historyCheckpoint);
+      }
     });
-    queue = turn.catch(() => {});
-    return turn;
-  };
 
   return {
     async send(prompt: string): Promise<void> {
-      enqueue(prompt).catch(error => {
+      await enqueue(prompt).catch(error => {
         options.handlers.onSessionError(
           error instanceof Error ? error.message : String(error),
           new Date().toISOString()
@@ -272,14 +281,14 @@ export async function createOpenAiAgent(
     async sendAndWait(prompt: string): Promise<void> {
       await enqueue(prompt);
     },
+    interrupt: () => turns.interrupt(),
     listModels,
     async setModel(modelId: string): Promise<void> {
       model = modelId;
     },
     async disconnect(): Promise<void> {
-      disconnected = true;
       abort.abort();
-      await queue;
+      await turns.disconnect();
     }
   };
 }

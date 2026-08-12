@@ -19,7 +19,10 @@ export interface BrowserCommandResult {
 }
 
 export interface BrowserCommandRunner {
-  run(request: PlaywrightRequest): Promise<BrowserCommandResult>;
+  run(
+    request: PlaywrightRequest,
+    options?: {signal: AbortSignal}
+  ): Promise<BrowserCommandResult>;
 }
 
 export function createBrowserCommandRunner(options: {
@@ -30,14 +33,18 @@ export function createBrowserCommandRunner(options: {
   let activeVideoRecordingPath: string | undefined;
 
   const captureFrame = async (
-    request: PlaywrightRequest
+    request: PlaywrightRequest,
+    signal?: AbortSignal
   ): Promise<PlaywrightResult | undefined> => {
     try {
-      const frame = await executor({
-        id: `${request.id}-frame`,
-        command: "screenshot",
-        args: ["--hires"]
-      });
+      const frame = await executor(
+        {
+          id: `${request.id}-frame`,
+          command: "screenshot",
+          args: ["--hires"]
+        },
+        {signal}
+      );
       return frame.ok ? frame : undefined;
     } catch (error) {
       await context.publish({
@@ -53,8 +60,10 @@ export function createBrowserCommandRunner(options: {
   };
 
   const execute = async (
-    request: PlaywrightRequest
+    request: PlaywrightRequest,
+    signal?: AbortSignal
   ): Promise<BrowserCommandResult> => {
+    signal?.throwIfAborted();
     const descriptor = getBrowserCommandDescriptor(request.command);
     await context.publish({
       type: "playwright_started",
@@ -71,7 +80,8 @@ export function createBrowserCommandRunner(options: {
         : request.command === "video-stop"
           ? activeVideoRecordingPath
           : undefined;
-    const actionResult = await executor(request, {videoRecordingPath});
+    const actionResult = await executor(request, {videoRecordingPath, signal});
+    signal?.throwIfAborted();
     if (actionResult.ok && request.command === "video-start") {
       activeVideoRecordingPath = videoRecordingPath;
     }
@@ -93,7 +103,7 @@ export function createBrowserCommandRunner(options: {
     }
     const frameResult =
       actionResult.ok && descriptor?.visualChange
-        ? await captureFrame(request)
+        ? await captureFrame(request, signal)
         : undefined;
     const result = {
       ...actionResult,
@@ -117,7 +127,10 @@ export function createBrowserCommandRunner(options: {
   };
 
   return {
-    async run(request: PlaywrightRequest): Promise<BrowserCommandResult> {
+    async run(
+      request: PlaywrightRequest,
+      runOptions?: {signal: AbortSignal}
+    ): Promise<BrowserCommandResult> {
       if (context.isStopped()) {
         return {ok: false, error: "Playwright session is stopping"};
       }
@@ -127,27 +140,38 @@ export function createBrowserCommandRunner(options: {
       }
       if (
         decision.kind === "approval" &&
-        !(await context.approvals.request(request, decision.reason))
+        !(await context.approvals.request(
+          request,
+          decision.reason,
+          runOptions?.signal
+        ))
       ) {
         return {ok: false, error: "User denied action"};
       }
       try {
+        runOptions?.signal.throwIfAborted();
         const descriptor = getBrowserCommandDescriptor(request.command);
         if (
           !context.state.browserOpened &&
           !descriptor?.opensBrowser &&
           !descriptor?.closesBrowser
         ) {
-          const openResult = await execute({
-            id: `${request.id}-open`,
-            command: "open",
-            args: [],
-            reason: "Initialize the live browser"
-          });
+          const openResult = await execute(
+            {
+              id: `${request.id}-open`,
+              command: "open",
+              args: [],
+              reason: "Initialize the live browser"
+            },
+            runOptions?.signal
+          );
           if (!openResult.ok) return openResult;
         }
-        return await execute(request);
+        return await execute(request, runOptions?.signal);
       } catch (error) {
+        if (runOptions?.signal.aborted) {
+          return {ok: false, error: "Agent interrupted"};
+        }
         const message = error instanceof Error ? error.message : String(error);
         await context.publish({
           type: "process_error",

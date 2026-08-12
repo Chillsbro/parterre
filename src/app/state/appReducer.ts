@@ -5,13 +5,21 @@ function deriveEventState(
   state: AppState,
   event: SessionEvent
 ): Partial<AppState> {
-  if (event.type === "user_message") {
-    return {awaitingResponse: true, activeRequests: []};
+  if (event.type === "agent_turn_started") {
+    const activeTurnIds = [...state.activeTurnIds, event.turnId];
+    return {activeTurnIds, activeRequests: []};
   }
-  if (event.type === "agent_message") {
-    return event.message.type === "assistant_message"
-      ? {awaitingResponse: false}
-      : {};
+  if (
+    event.type === "agent_turn_finished" ||
+    event.type === "agent_interrupted"
+  ) {
+    const activeTurnIds = state.activeTurnIds.filter(id => id !== event.turnId);
+    return {
+      activeTurnIds,
+      ...(event.type === "agent_interrupted"
+        ? {activeRequests: [], pendingApproval: undefined}
+        : {})
+    };
   }
   if (event.type === "playwright_started") {
     return {activeRequests: [...state.activeRequests, event.request]};
@@ -54,7 +62,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     return {
       ...state,
       events: state.events.filter(event => event.type === "model_changed"),
-      awaitingResponse: false,
+      activeTurnIds: [],
       activeRequests: [],
       latestPageUrl: undefined,
       latestPageTitle: undefined,

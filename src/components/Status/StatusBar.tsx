@@ -19,6 +19,7 @@ export function StatusBar(props: {
   status: string;
   pageUrl: string | undefined;
   model: string;
+  agentActive: boolean;
 }): React.ReactElement {
   const protocol = selectTerminalImageProtocol(useTerminalInfo());
   const degraded =
@@ -66,6 +67,9 @@ export function StatusBar(props: {
             keys="⌃B"
             label={props.browserFocused ? "panels" : "browser"}
           />
+          {props.agentActive ? (
+            <Keybinding keys="esc" label="interrupt" />
+          ) : null}
           <Keybinding keys="⌃C" label="quit" />
         </Box>
       ) : (

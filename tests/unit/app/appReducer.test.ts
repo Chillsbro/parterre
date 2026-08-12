@@ -29,6 +29,31 @@ test("tracks approval state from canonical events", () => {
   expect(resolvedState.pendingApproval).toBeUndefined();
 });
 
+test("an interruption clears active response and approval state", () => {
+  const activeState = {
+    ...initialAppState,
+    activeTurnIds: ["turn-1"],
+    activeRequests: [{id: "request-1", command: "click", args: ["e1"]}],
+    pendingApproval: {
+      request: {id: "request-1", command: "click", args: ["e1"]},
+      reason: "Sensitive"
+    }
+  };
+
+  const interrupted = appReducer(activeState, {
+    type: "event",
+    event: {
+      type: "agent_interrupted",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      turnId: "turn-1"
+    }
+  });
+
+  expect(interrupted.activeTurnIds).toEqual([]);
+  expect(interrupted.activeRequests).toEqual([]);
+  expect(interrupted.pendingApproval).toBeUndefined();
+});
+
 test("toggles embedded browser focus", () => {
   const focusedState = appReducer(initialAppState, {
     type: "toggleBrowserFocus"

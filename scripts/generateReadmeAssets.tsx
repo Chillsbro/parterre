@@ -238,6 +238,7 @@ function renderWorkspaceFrame(frame: {
             status="running"
             pageUrl={frame.statusUrl}
             model="gpt-5"
+            agentActive={false}
           />
         </Box>
       </InkPictureProvider>

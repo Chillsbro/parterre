@@ -3,7 +3,12 @@ import type {ProcessResult} from "../types/index.js";
 export async function runProcess(
   command: string,
   args: string[],
-  options: {cwd: string; env?: Record<string, string>; timeoutMs?: number}
+  options: {
+    cwd: string;
+    env?: Record<string, string>;
+    timeoutMs?: number;
+    signal?: AbortSignal | undefined;
+  }
 ): Promise<ProcessResult> {
   const startedAt = performance.now();
   const childProcess = Bun.spawn([command, ...args], {
@@ -11,7 +16,8 @@ export async function runProcess(
     env: {...Bun.env, ...options.env},
     stdin: "ignore",
     stdout: "pipe",
-    stderr: "pipe"
+    stderr: "pipe",
+    ...(options.signal ? {signal: options.signal} : {})
   });
   const timeout = setTimeout(
     () => childProcess.kill(),

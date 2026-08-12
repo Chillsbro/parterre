@@ -28,6 +28,21 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
       });
       continue;
     }
+    if (event.type === "agent_interrupted") {
+      items.push({
+        id: `${event.turnId}-interrupted`,
+        kind: "tool",
+        content: "Agent interrupted",
+        ok: true
+      });
+      continue;
+    }
+    if (
+      event.type === "agent_turn_started" ||
+      event.type === "agent_turn_finished"
+    ) {
+      continue;
+    }
     if (event.type === "playwright_finished") {
       items.push({
         id: event.result.request.id,

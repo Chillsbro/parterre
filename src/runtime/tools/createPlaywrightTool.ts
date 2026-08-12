@@ -25,17 +25,23 @@ export function createPlaywrightTool(
         .optional()
         .describe("Short explanation of why the action is needed")
     },
-    handler: async (input: {
-      command: string;
-      args: Array<string | number | boolean>;
-      reason?: string;
-    }) => {
-      return runner.run({
-        id: randomUUID(),
-        command: input.command,
-        args: input.args ?? [],
-        ...(input.reason ? {reason: input.reason} : {})
-      });
+    handler: async (
+      input: {
+        command: string;
+        args: Array<string | number | boolean>;
+        reason?: string;
+      },
+      context
+    ) => {
+      return runner.run(
+        {
+          id: randomUUID(),
+          command: input.command,
+          args: input.args ?? [],
+          ...(input.reason ? {reason: input.reason} : {})
+        },
+        context
+      );
     }
   };
 }

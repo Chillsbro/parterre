@@ -141,6 +141,28 @@ test("shows the approval dialog and resolves it from a keypress", async () => {
   app.unmount();
 });
 
+test("interrupts an active agent turn with Escape", async () => {
+  const runtime = createScriptedRuntime();
+  const app = renderApp(runtime);
+  await app.ready();
+  runtime.emit({
+    type: "agent_turn_started",
+    timestamp: new Date().toISOString(),
+    turnId: "active-turn"
+  });
+  await waitFor(() => app.frame().includes("Thinking"));
+  expect(app.frame()).toContain("esc interrupt");
+
+  app.stdin.write("\u001b");
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  expect(runtime.interruptionCount()).toBe(1);
+  expect(app.frame()).toContain("Agent interrupted");
+  expect(app.frame()).not.toContain("Thinking");
+  expect(app.frame()).not.toContain("esc interrupt");
+  app.unmount();
+});
+
 test("clears the transcript with /clear", async () => {
   const runtime = createScriptedRuntime({
     respond: () => [assistantReply("Scripted reply.")]

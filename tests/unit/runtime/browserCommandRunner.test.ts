@@ -154,3 +154,27 @@ test("owns video recording lifecycle state in the browser command runner", async
   expect(executionOptions[1]?.videoRecordingPath).toBeUndefined();
   expect(executionOptions[3]?.videoRecordingPath).toBe(recordingPath);
 });
+
+test("waits for running browser work to stop when interrupted", async () => {
+  const {context, events} = createFakeContext();
+  const controller = new AbortController();
+  let executorStarted = false;
+  const executor: PlaywrightExecutor = async (request, options) => {
+    executorStarted = true;
+    await new Promise<void>(resolve => {
+      options?.signal?.addEventListener("abort", () => resolve(), {once: true});
+    });
+    return {request, ok: true, output: "", artifacts: [], durationMs: 1};
+  };
+  const runner = createBrowserCommandRunner({context, executor});
+  const running = runner.run(
+    {id: "interrupt", command: "snapshot", args: []},
+    {signal: controller.signal}
+  );
+  while (!executorStarted) await new Promise(resolve => setTimeout(resolve, 0));
+
+  controller.abort();
+
+  expect(await running).toEqual({ok: false, error: "Agent interrupted"});
+  expect(events.map(event => event.type)).toEqual(["playwright_started"]);
+});

@@ -40,6 +40,11 @@ export type SessionEvent =
     }
   | {type: "user_message"; timestamp: string; id: string; content: string}
   | {type: "agent_message"; timestamp: string; message: AgentMessage}
+  | {
+      type: "agent_turn_started" | "agent_turn_finished" | "agent_interrupted";
+      timestamp: string;
+      turnId: string;
+    }
   | {type: "playwright_started"; timestamp: string; request: PlaywrightRequest}
   | {type: "playwright_finished"; timestamp: string; result: PlaywrightResult}
   | {
