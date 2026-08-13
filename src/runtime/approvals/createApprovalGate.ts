@@ -1,14 +1,13 @@
-import type {PlaywrightRequest} from "../../playwright/index.js";
-import type {SessionEvent} from "../../sessions/index.js";
+import type {ApprovalRequest, SessionEvent} from "../../sessions/index.js";
 
 interface PendingApproval {
-  request: PlaywrightRequest;
+  request: ApprovalRequest;
   resolve(approved: boolean): void;
 }
 
 export interface ApprovalGate {
   request(
-    request: PlaywrightRequest,
+    request: ApprovalRequest,
     reason: string,
     signal?: AbortSignal
   ): Promise<boolean>;

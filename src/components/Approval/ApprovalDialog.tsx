@@ -1,11 +1,11 @@
 import {Box, Text} from "ink";
 import type React from "react";
-import type {PlaywrightRequest} from "../../playwright/index.js";
+import type {ApprovalRequest} from "../../sessions/index.js";
 import {parterreTheme} from "../../theme/index.js";
 import {Panel} from "../Layout/index.js";
 
 export function ApprovalDialog(props: {
-  request: PlaywrightRequest;
+  request: ApprovalRequest;
   reason: string;
 }): React.ReactElement {
   return (

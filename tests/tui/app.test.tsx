@@ -157,6 +157,30 @@ test("shows the approval dialog and resolves it from a keypress", async () => {
   app.unmount();
 });
 
+test("shows workspace file approvals in the same approval dialog", async () => {
+  const runtime = createScriptedRuntime();
+  const app = renderApp(runtime);
+  await app.ready();
+  runtime.emit({
+    type: "approval_requested",
+    timestamp: new Date().toISOString(),
+    request: {
+      id: "workspace-approval-1",
+      command: "write-workspace-file",
+      args: ["README.md"]
+    },
+    reason: "Replace workspace file README.md (42 bytes)"
+  });
+  await waitFor(() => app.frame().includes("approval needed"));
+  expect(app.frame()).toContain("write-workspace-file README.md");
+  app.stdin.write("y");
+  await waitFor(() => !app.frame().includes("approval needed"));
+  expect(runtime.approvals).toEqual([
+    {requestId: "workspace-approval-1", approved: true}
+  ]);
+  app.unmount();
+});
+
 test("interrupts an active agent turn with Escape", async () => {
   const runtime = createScriptedRuntime();
   const app = renderApp(runtime);
