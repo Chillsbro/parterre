@@ -8,6 +8,7 @@ Usage:
   parterre run [options]
   parterre setup                Choose the agent (Codex, Copilot, Claude, or an API endpoint)
   parterre sessions [--storage <path>]
+  parterre resume <session-id> [options]
   parterre replay <session-id> [--storage <path>]
   parterre delete <session-id> [--storage <path>]
 
@@ -19,6 +20,14 @@ Run options:
   --storage <path>     Session storage directory
   --playwright <path>  playwright-cli executable
   --redact <value>     Repeatable value removed from persisted events
+
+Resume options:
+  --storage <path>     Session storage directory
+  --playwright <path>  playwright-cli executable
+  --base-url <url>     Endpoint override for legacy OpenAI-compatible sessions
+  --redact <value>     Original redactions in order, then any new values
+  --allow-unverified-redactions
+                       Explicitly resume a legacy session whose redactions cannot be verified
 
 ${formatCommandSections()}
 

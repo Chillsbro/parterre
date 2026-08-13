@@ -4,5 +4,6 @@ export * from "./capturing/index.js";
 export * from "./codebase/index.js";
 export * from "./creating/index.js";
 export * from "./providers/index.js";
+export * from "./resuming/index.js";
 export * from "./tools/index.js";
 export * from "./types/index.js";

@@ -24,4 +24,5 @@ export interface RuntimeContext {
   flush(): Promise<void>;
   isStopped(): boolean;
   beginStop(runCleanup: () => Promise<void>): Promise<void>;
+  releaseSessionLease?: (() => Promise<void>) | undefined;
 }

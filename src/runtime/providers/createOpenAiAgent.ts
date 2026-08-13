@@ -132,7 +132,8 @@ export async function createOpenAiAgent(
     ])
   );
   const history: ChatMessage[] = [
-    {role: "system", content: buildSystemPrompt(options.systemPromptAppend)}
+    {role: "system", content: buildSystemPrompt(options.systemPromptAppend)},
+    ...(options.resume?.history ?? [])
   ];
   const listModels = async (): Promise<ModelChoice[]> => {
     const response = await fetchImpl(`${baseUrl}/models`, {
@@ -155,6 +156,7 @@ export async function createOpenAiAgent(
     if (!first) throw new Error(`No models available at ${baseUrl}`);
     model = first.id;
   }
+  await options.handlers.onSessionIdentity?.({provider: "openai", model});
 
   const requestCompletion = async (
     turnId: string,

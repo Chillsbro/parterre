@@ -37,6 +37,26 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
       });
       continue;
     }
+    if (event.type === "session_resumed") {
+      items.push({
+        id: `${event.timestamp}-resumed`,
+        kind: "tool",
+        content: `Session resumed with ${event.provider}`,
+        detail: `${event.mode} context, ${event.browser} browser restore`,
+        ok: true
+      });
+      continue;
+    }
+    if (event.type === "browser_restore_warning") {
+      items.push({
+        id: `${event.timestamp}-browser-restore-warning`,
+        kind: "tool",
+        content: "Browser profile restore warning",
+        detail: event.message,
+        ok: false
+      });
+      continue;
+    }
     if (
       event.type === "agent_turn_started" ||
       event.type === "agent_turn_finished"

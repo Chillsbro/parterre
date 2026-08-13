@@ -1,11 +1,13 @@
 import {rm} from "node:fs/promises";
 import {getSessionPath} from "../paths/index.js";
+import {assertSessionLeaseInactive} from "./acquireSessionLease.js";
 import {openSessionDatabase} from "./openSessionDatabase.js";
 
 export async function removeSession(
   storageDir: string,
   sessionId: string
 ): Promise<void> {
+  assertSessionLeaseInactive(storageDir, sessionId);
   const database = openSessionDatabase(storageDir);
   database
     .query("DELETE FROM events WHERE sessionId = $id")

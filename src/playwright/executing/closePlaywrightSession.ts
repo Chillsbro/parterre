@@ -23,7 +23,13 @@ export async function closePlaywrightSession(options: {
   }
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    if (!(await isPlaywrightSessionOpen(options))) return;
+    try {
+      if (!(await isPlaywrightSessionOpen(options))) return;
+    } catch {
+      // The successful close response is authoritative when the registry is
+      // briefly unreadable during process teardown.
+      return;
+    }
     await Bun.sleep(100);
   }
   throw new Error(

@@ -2,16 +2,21 @@ import {
   closePlaywrightSession,
   createPlaywrightExecutor
 } from "../../playwright/index.js";
-import {updateSessionStatus} from "../../sessions/index.js";
+import {
+  updateSessionAgentIdentity,
+  updateSessionStatus
+} from "../../sessions/index.js";
 import {
   createBrowserAssertionRunner,
   createBrowserCommandRunner
 } from "../browser/index.js";
+import {ensureScreencast} from "../capturing/index.js";
 import {
   type AgentFactory,
   type AgentHandle,
   resolveAgentFactory
 } from "../providers/index.js";
+import type {SessionResumePlan} from "../resuming/index.js";
 import {
   createBrowserAssertionTool,
   createMaterializeTargetTestTool,
@@ -26,8 +31,10 @@ import {systemPromptAppend} from "./systemPromptAppend.js";
 
 export async function startRuntimeAgent(
   context: RuntimeContext,
-  agentFactory?: AgentFactory
+  agentFactory?: AgentFactory,
+  resume?: SessionResumePlan | undefined
 ): Promise<AgentHandle> {
+  let agent: AgentHandle | undefined;
   try {
     const createAgent =
       agentFactory ?? (await resolveAgentFactory(context.config.provider));
@@ -49,12 +56,20 @@ export async function startRuntimeAgent(
       executor,
       passedAssertionIds
     });
-    return await createAgent({
+    agent = await createAgent({
       sessionId: context.sessionId,
       model: context.config.model,
       workspace: context.config.workspace,
       systemPromptAppend,
       baseUrl: context.config.baseUrl,
+      ...(resume
+        ? {
+            resume: {
+              conversationId: resume.metadata.providerSessionId,
+              history: resume.history
+            }
+          }
+        : {}),
       tools: [
         createPlaywrightTool(runner),
         createBrowserAssertionTool(assertionRunner),
@@ -92,11 +107,34 @@ export async function startRuntimeAgent(
             context.sessionId,
             "failed"
           );
-        }
+        },
+        onSessionIdentity: identity =>
+          updateSessionAgentIdentity(
+            context.config.storageDir,
+            context.sessionId,
+            identity
+          )
       }
     });
+    if (resume && context.state.browserOpened) {
+      await ensureScreencast(context);
+    } else if (resume?.lastUrl) {
+      const restored = await runner.run({
+        id: `resume-${context.sessionId}`,
+        command: "open",
+        args: [resume.lastUrl],
+        reason: "Restore the last resumable page URL"
+      });
+      if (!restored.ok) {
+        throw new Error(
+          `Could not restore ${resume.lastUrl}: ${restored.error ?? restored.output ?? "unknown browser error"}`
+        );
+      }
+    }
+    return agent;
   } catch (error) {
     const cleanupResults = await Promise.allSettled([
+      ...(agent ? [agent.disconnect()] : []),
       closePlaywrightSession({
         command: context.config.playwrightCommand,
         workspace: context.config.workspace,

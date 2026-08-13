@@ -16,7 +16,8 @@ export function useSessionRuntime(
   config: AppConfig,
   dispatch: Dispatch<AppAction>,
   createRuntime: typeof createSessionRuntime = createSessionRuntime,
-  liveFrames?: LiveFrameSink
+  liveFrames?: LiveFrameSink,
+  resumeSessionId?: string
 ): {
   runtimeRef: {current: RuntimeController | undefined};
   stopRuntime: () => Promise<void>;
@@ -66,6 +67,7 @@ export function useSessionRuntime(
     const runtimePromise = createRuntime({
       config,
       ...(liveFrames ? {frameFormat: liveFrames.frameFormat} : {}),
+      ...(resumeSessionId ? {resumeSessionId} : {}),
       onNotification: notification => {
         if (!mounted) return;
         if (notification.type === "liveFrame") {
@@ -120,6 +122,7 @@ export function useSessionRuntime(
     dispatch,
     liveFrames,
     reportHostError,
+    resumeSessionId,
     stopRuntime
   ]);
 

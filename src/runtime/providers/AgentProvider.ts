@@ -1,5 +1,6 @@
 import type {z} from "zod";
 import type {ProviderName} from "../../config/index.js";
+import type {ResumeConversationMessage} from "../resuming/index.js";
 import type {ModelChoice} from "../types/index.js";
 
 export interface AgentToolDefinition {
@@ -13,6 +14,11 @@ export interface AgentEventHandlers {
   onAssistantDelta(id: string, delta: string, timestamp: string): void;
   onAssistantMessage(id: string, content: string, timestamp: string): void;
   onSessionError(message: string, timestamp: string): void;
+  onSessionIdentity?(identity: {
+    provider: Exclude<ProviderName, "auto">;
+    conversationId?: string | undefined;
+    model?: string | undefined;
+  }): Promise<void>;
 }
 
 export interface AgentHandle {
@@ -30,6 +36,12 @@ export interface AgentFactoryOptions {
   workspace: string;
   systemPromptAppend: string;
   baseUrl?: string | undefined;
+  resume?:
+    | {
+        conversationId?: string | undefined;
+        history: ResumeConversationMessage[];
+      }
+    | undefined;
   tools: AgentToolDefinition[];
   handlers: AgentEventHandlers;
 }

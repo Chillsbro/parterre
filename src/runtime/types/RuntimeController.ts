@@ -21,6 +21,7 @@ export interface RuntimeController {
   resolveApproval(requestId: string, approved: boolean): Promise<void>;
   listModels(): Promise<ModelChoice[]>;
   setModel(modelId: string): Promise<void>;
+  clearTranscript(): Promise<void>;
   authorizeCodebaseRoot(path: string): string;
   clearCodebaseProfile(path: string): Promise<void>;
   isWorkspaceProfileStale(): Promise<boolean>;

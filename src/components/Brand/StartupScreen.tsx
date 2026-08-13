@@ -23,6 +23,7 @@ const spinnerFrames = [
 export function StartupScreen(props: {
   status: SessionStatus;
   errorMessage: string | undefined;
+  notice?: string | undefined;
   onComplete: () => void;
 }): React.ReactElement {
   const {columns, rows} = useWindowSize();
@@ -84,6 +85,17 @@ export function StartupScreen(props: {
         >
           <Text color={parterreTheme.muted} wrap="wrap">
             {props.errorMessage}
+          </Text>
+        </Box>
+      ) : null}
+      {props.notice ? (
+        <Box
+          marginTop={1}
+          width={Math.min(columns - 8, 72)}
+          justifyContent="center"
+        >
+          <Text color={parterreTheme.warning} wrap="wrap">
+            {props.notice}
           </Text>
         </Box>
       ) : null}

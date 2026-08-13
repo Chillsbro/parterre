@@ -13,8 +13,14 @@ export function createRuntimeContext(options: {
   config: AppConfig;
   onNotification: (notification: RuntimeNotification) => void;
   frameFormat?: FrameFormat;
+  sessionId?: string | undefined;
+  playwrightSession?: string | undefined;
+  browserOpened?: boolean | undefined;
+  releaseSessionLease?: (() => Promise<void>) | undefined;
 }): RuntimeContext {
-  const sessionId = `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
+  const sessionId =
+    options.sessionId ??
+    `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}`;
   let queueTail: Promise<void> = Promise.resolve();
   let stopped = false;
   let stopPromise: Promise<void> | undefined;
@@ -37,10 +43,14 @@ export function createRuntimeContext(options: {
     config: options.config,
     frameFormat: options.frameFormat ?? "jpeg",
     sessionId,
-    playwrightSession: `tui-${randomUUID().slice(0, 8)}`,
+    playwrightSession:
+      options.playwrightSession ?? `tui-${randomUUID().slice(0, 8)}`,
     approvals: createApprovalGate(publish),
     authorizedCodebaseRoots: new Set([resolve(options.config.workspace)]),
-    state: {browserOpened: false, screencast: undefined},
+    state: {
+      browserOpened: options.browserOpened ?? false,
+      screencast: undefined
+    },
     onNotification: options.onNotification,
     publish,
     flush: () => queueTail,
@@ -50,6 +60,9 @@ export function createRuntimeContext(options: {
       stopped = true;
       stopPromise = runCleanup();
       return stopPromise;
-    }
+    },
+    ...(options.releaseSessionLease
+      ? {releaseSessionLease: options.releaseSessionLease}
+      : {})
   };
 }

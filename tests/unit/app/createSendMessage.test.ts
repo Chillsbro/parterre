@@ -9,6 +9,7 @@ function createDeps() {
   const errors: unknown[] = [];
   const sent: string[][] = [];
   const runtime = {
+    clearTranscript: async () => {},
     sendUserMessage: async (
       prompt: string,
       _wait?: boolean,

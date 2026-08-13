@@ -3,6 +3,7 @@ import {mkdtemp, rm, stat} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {
+  acquireSessionLease,
   appendSessionEvent,
   closeSessionDatabase,
   createSession,
@@ -48,6 +49,39 @@ test("persists replayable redacted session events in sqlite", async () => {
       }
     ]);
     expect((await stat(join(storageDir, "parterre.db"))).isFile()).toBe(true);
+  } finally {
+    closeSessionDatabase(storageDir);
+    await rm(storageDir, {recursive: true, force: true});
+  }
+});
+
+test("allows only one live owner to resume a session", async () => {
+  const storageDir = await mkdtemp(join(tmpdir(), "parterre-"));
+  try {
+    await createSession(storageDir, metadata);
+    const first = await acquireSessionLease(storageDir, metadata.id);
+    expect(acquireSessionLease(storageDir, metadata.id)).rejects.toThrow(
+      "already active"
+    );
+    await first.release();
+    const second = await acquireSessionLease(storageDir, metadata.id);
+    await second.release();
+  } finally {
+    closeSessionDatabase(storageDir);
+    await rm(storageDir, {recursive: true, force: true});
+  }
+});
+
+test("refuses to delete a live leased session", async () => {
+  const storageDir = await mkdtemp(join(tmpdir(), "parterre-"));
+  try {
+    await createSession(storageDir, metadata);
+    const lease = await acquireSessionLease(storageDir, metadata.id);
+    expect(removeSession(storageDir, metadata.id)).rejects.toThrow(
+      "already active"
+    );
+    await lease.release();
+    await removeSession(storageDir, metadata.id);
   } finally {
     closeSessionDatabase(storageDir);
     await rm(storageDir, {recursive: true, force: true});

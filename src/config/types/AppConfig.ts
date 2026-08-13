@@ -8,10 +8,20 @@ export interface AppConfig {
   playwrightCommand: string;
   redactions: string[];
   baseUrl?: string | undefined;
+  allowUnverifiedRedactions?: boolean | undefined;
 }
 
 export type CliCommand =
   | {name: "run"; config: AppConfig}
+  | {
+      name: "resume";
+      storageDir: string;
+      sessionId: string;
+      playwrightCommand: string;
+      redactions: string[];
+      baseUrl?: string | undefined;
+      allowUnverifiedRedactions: boolean;
+    }
   | {name: "sessions"; storageDir: string}
   | {name: "replay"; storageDir: string; sessionId: string}
   | {name: "delete"; storageDir: string; sessionId: string}
