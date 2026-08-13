@@ -10,7 +10,7 @@ export type AgentMessage =
 export type SessionStatus = "starting" | "running" | "stopped" | "failed";
 
 export interface SessionMetadata {
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   id: string;
   createdAt: string;
   updatedAt: string;
@@ -19,6 +19,11 @@ export interface SessionMetadata {
   model: string;
   playwrightSession: string;
   status: SessionStatus;
+  providerSessionId?: string | undefined;
+  baseUrl?: string | undefined;
+  resumeCount?: number | undefined;
+  redactionCount?: number | undefined;
+  redactionVerifiers?: string[] | undefined;
 }
 
 export interface PlaywrightResult {
@@ -38,7 +43,20 @@ export type SessionEvent =
       timestamp: string;
       message?: string;
     }
+  | {
+      type: "session_resumed";
+      timestamp: string;
+      provider: string;
+      mode: "provider" | "history";
+      browser: "session" | "url" | "none";
+    }
+  | {
+      type: "browser_restore_warning";
+      timestamp: string;
+      message: string;
+    }
   | {type: "user_message"; timestamp: string; id: string; content: string}
+  | {type: "transcript_cleared"; timestamp: string}
   | {type: "agent_message"; timestamp: string; message: AgentMessage}
   | {
       type: "agent_turn_started" | "agent_turn_finished" | "agent_interrupted";

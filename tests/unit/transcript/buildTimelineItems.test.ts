@@ -58,6 +58,48 @@ test("renders an intentional agent interruption as a tool event", () => {
   ]);
 });
 
+test("renders the durable resume mode and browser recovery", () => {
+  expect(
+    buildTimelineItems([
+      {
+        type: "session_resumed",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        provider: "codex",
+        mode: "provider",
+        browser: "session"
+      }
+    ])
+  ).toEqual([
+    {
+      id: "2026-01-01T00:00:00.000Z-resumed",
+      kind: "tool",
+      content: "Session resumed with codex",
+      detail: "provider context, session browser restore",
+      ok: true
+    }
+  ]);
+});
+
+test("shows an authenticated browser-state warning before restore", () => {
+  expect(
+    buildTimelineItems([
+      {
+        type: "browser_restore_warning",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        message: "Authenticated state may be restored."
+      }
+    ])
+  ).toEqual([
+    {
+      id: "2026-01-01T00:00:00.000Z-browser-restore-warning",
+      kind: "tool",
+      content: "Browser profile restore warning",
+      detail: "Authenticated state may be restored.",
+      ok: false
+    }
+  ]);
+});
+
 test("adds a filesystem link after a video recording finishes", () => {
   const items = buildTimelineItems([
     {

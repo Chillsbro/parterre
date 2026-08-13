@@ -15,6 +15,9 @@ const localCommandHandlers: Record<LocalSlashCommandName, LocalCommandHandler> =
     },
     "/clear": (_rest, deps) => {
       deps.dispatch({type: "clearEvents"});
+      void deps.runtimeRef.current
+        ?.clearTranscript()
+        .catch(deps.reportHostError);
     },
     "/model": (rest, deps) => {
       const target = rest.join(" ").trim();

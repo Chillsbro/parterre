@@ -18,6 +18,7 @@ function createHarness(completions: Array<Response | "wait-for-abort">) {
   const messages: string[] = [];
   const errors: string[] = [];
   const toolInputs: unknown[] = [];
+  const identities: unknown[] = [];
   const completionBodies: {
     model: string;
     messages: {role: string; content?: string | null}[];
@@ -66,7 +67,10 @@ function createHarness(completions: Array<Response | "wait-for-abort">) {
     handlers: {
       onAssistantDelta: (_id, delta) => deltas.push(delta),
       onAssistantMessage: (_id, content) => messages.push(content),
-      onSessionError: message => errors.push(message)
+      onSessionError: message => errors.push(message),
+      async onSessionIdentity(identity) {
+        identities.push(identity);
+      }
     }
   };
   return {
@@ -76,6 +80,7 @@ function createHarness(completions: Array<Response | "wait-for-abort">) {
     messages,
     errors,
     toolInputs,
+    identities,
     completionBodies
   };
 }
@@ -100,6 +105,26 @@ test("streams deltas and finalizes the assistant reply", async () => {
     "user"
   ]);
   expect(body?.tools.map(tool => tool.function.name)).toEqual(["echo"]);
+});
+
+test("seeds OpenAI-compatible history and persists the resolved model", async () => {
+  const harness = createHarness([
+    sse([{choices: [{delta: {content: "continued"}}]}])
+  ]);
+  harness.options.resume = {
+    history: [
+      {role: "user", content: "old request"},
+      {role: "assistant", content: "old answer"}
+    ]
+  };
+  const agent = await createOpenAiAgent(harness.options, harness.fetchImpl);
+
+  await agent.sendAndWait("continue");
+
+  expect(
+    harness.completionBodies[0]?.messages.map(message => message.role)
+  ).toEqual(["system", "user", "assistant", "user"]);
+  expect(harness.identities).toEqual([{provider: "openai", model: "llama3"}]);
 });
 
 test("executes tool calls and feeds results back into the loop", async () => {

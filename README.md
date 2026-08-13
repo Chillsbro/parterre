@@ -140,12 +140,27 @@ transcript includes a clickable `view here` link to the WebM file.
 
 ```sh
 parterre sessions             # list
+parterre resume <session-id>  # continue its transcript and provider conversation
 parterre replay <session-id>  # print a session back
 parterre delete <session-id>  # remove one
 ```
 
 Pass repeated `--redact <value>` options to strip known secrets from
-persisted events.
+persisted events. Resume requires the original values in the same order before
+any new redactions; Parterre stores only salted verifiers for this check.
+Sessions created before verifiers existed fail closed unless you explicitly
+pass `--allow-unverified-redactions` after reviewing their history.
+
+Codex, Copilot, and Claude resume their native provider conversation when its
+durable ID is available. OpenAI-compatible endpoints and legacy sessions use a
+bounded, completed-turn transcript instead. The original provider, recorded
+model, workspace, and endpoint stay pinned. Only one process can own a session
+at a time, and unresolved approvals are never replayed.
+
+The browser uses the session's persistent profile. A crashed session reuses a
+still-live compatible browser; a cleanly stopped session starts a new browser
+at its last safe HTTP(S) URL. Parterre shows a warning before either path
+because the profile may restore authenticated website state.
 
 ## How it fits together
 

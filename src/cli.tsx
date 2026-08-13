@@ -1,11 +1,13 @@
 #!/usr/bin/env bun
 import {render} from "ink";
 import {App} from "./app/index.js";
-import {loadCliCommand} from "./config/index.js";
+import {type AppConfig, loadCliCommand} from "./config/index.js";
 import {printHelp} from "./help/index.js";
 import {assertPlaywrightAvailable} from "./playwright/index.js";
 import {printReplaySession} from "./replay/index.js";
+import {resolveResumeConfig} from "./runtime/index.js";
 import {
+  getSession,
   listSessions,
   readSessionEvents,
   removeSession
@@ -56,14 +58,37 @@ async function main(): Promise<void> {
     process.stdout.write(`Deleted session ${command.sessionId}.\n`);
     return;
   }
-  await assertPlaywrightAvailable(command.config.playwrightCommand);
+  const resumeMetadata =
+    command.name === "resume"
+      ? await getSession(command.storageDir, command.sessionId)
+      : undefined;
+  let config: AppConfig;
+  if (command.name === "resume") {
+    if (!resumeMetadata)
+      throw new Error(`Unknown session: ${command.sessionId}`);
+    config = resolveResumeConfig({
+      metadata: resumeMetadata,
+      model: resumeMetadata.model,
+      storageDir: command.storageDir,
+      playwrightCommand: command.playwrightCommand,
+      redactions: command.redactions,
+      baseUrl: command.baseUrl,
+      allowUnverifiedRedactions: command.allowUnverifiedRedactions
+    });
+  } else {
+    config = command.config;
+  }
+  await assertPlaywrightAvailable(config.playwrightCommand);
   const graphics = await probeTerminalGraphics();
   const mouse = createMouseStdin(process.stdin, process.stdout);
   mouse.enableTracking();
   process.on("exit", mouse.disableTracking);
   const app = render(
     <App
-      config={command.config}
+      config={config}
+      resumeSessionId={
+        command.name === "resume" ? command.sessionId : undefined
+      }
       graphics={graphics}
       subscribeWheel={mouse.subscribeWheel}
     />,
