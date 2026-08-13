@@ -1,33 +1,29 @@
 import {expect, test} from "bun:test";
-import type {
-  AgentFactory,
-  AgentToolDefinition
-} from "../../../src/runtime/index.js";
+import type {AgentFactory} from "../../../src/runtime/index.js";
 import {closeSessionDatabase} from "../../../src/sessions/index.js";
 import {startRuntimeHarness} from "../../support/runtimeHarness.js";
 
-test("interrupting denies a pending action and keeps the session usable", async () => {
+test("interrupting an active turn keeps the session usable", async () => {
   let active = false;
   let activeAbort: AbortController | undefined;
   let activeTurn: Promise<void> | undefined;
-  let deniedResult: unknown;
+  let markTurnStarted = (): void => {};
+  const turnStarted = new Promise<void>(resolve => {
+    markTurnStarted = resolve;
+  });
   const factory: AgentFactory = async options => {
-    const playwright = options.tools.find(
-      tool => tool.name === "playwright_cli"
-    ) as AgentToolDefinition;
     const run = async (prompt: string): Promise<void> => {
       const turnAbort = new AbortController();
       activeAbort = turnAbort;
       active = true;
       try {
-        if (prompt === "clear cookies") {
-          deniedResult = await playwright.handler(
-            {
-              command: "cookie-clear",
-              args: []
-            },
-            {signal: turnAbort.signal}
-          );
+        if (prompt === "wait") {
+          markTurnStarted();
+          await new Promise<void>(resolve => {
+            turnAbort.signal.addEventListener("abort", () => resolve(), {
+              once: true
+            });
+          });
           return;
         }
         options.handlers.onAssistantMessage(
@@ -62,14 +58,12 @@ test("interrupting denies a pending action and keeps the session usable", async 
   };
   const harness = await startRuntimeHarness({agentFactory: factory});
   try {
-    const activeTurn = harness.controller.sendUserMessage("clear cookies");
-    await harness.waitForEvent("approval_requested");
+    const activeTurn = harness.controller.sendUserMessage("wait");
+    await turnStarted;
 
     expect(await harness.controller.interrupt()).toBe(true);
     await activeTurn;
     await harness.waitForEvent("agent_interrupted");
-    expect(deniedResult).toEqual({ok: false, error: "User denied action"});
-
     await harness.controller.sendUserMessage("continue", true);
     await harness.waitForEvent(
       "agent_message",

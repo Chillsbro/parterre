@@ -88,7 +88,7 @@ test("denies commands outside the allowlist without starting them", async () => 
   expect(started).toBeUndefined();
 }, 60000);
 
-test("runs a sensitive command after the user approves it", async () => {
+test("runs a managed state command without approval", async () => {
   agent.turns.push({
     steps: [
       {
@@ -101,29 +101,21 @@ test("runs a sensitive command after the user approves it", async () => {
       {reply: "Stored the value."}
     ]
   });
-  await harness.controller.sendUserMessage("store a value", false);
-  const requested = await harness.waitForEvent(
-    "approval_requested",
-    event => event.request.command === "localstorage-set"
-  );
-  expect(requested.reason).toBe(
-    "The localstorage-set command can mutate browser or filesystem state"
-  );
-  await harness.controller.resolveApproval(requested.request.id, true);
+  await harness.controller.sendUserMessage("store a value", true);
   const finished = await harness.waitForEvent(
     "playwright_finished",
     event => event.result.request.command === "localstorage-set"
   );
   expect(finished.result.ok).toBe(true);
-  const resolved = await harness.waitForEvent(
-    "approval_resolved",
-    event => event.requestId === requested.request.id
+  const requested = harness.events.find(
+    event =>
+      event.type === "approval_requested" &&
+      event.request.command === "localstorage-set"
   );
-  expect(resolved.approved).toBe(true);
-  await agent.waitForIdle();
+  expect(requested).toBeUndefined();
 }, 60000);
 
-test("never executes a command the user denies", async () => {
+test("denies local file navigation without executing it", async () => {
   agent.turns.push({
     steps: [
       {
@@ -133,18 +125,18 @@ test("never executes a command the user denies", async () => {
       {reply: "I could not open that file."}
     ]
   });
-  await harness.controller.sendUserMessage("open a local file", false);
-  const requested = await harness.waitForEvent("approval_requested", event =>
-    event.request.args.includes("file:///etc/hosts")
+  await harness.controller.sendUserMessage("open a local file", true);
+  const requested = harness.events.find(
+    event =>
+      event.type === "approval_requested" &&
+      event.request.args.includes("file:///etc/hosts")
   );
-  expect(requested.reason).toBe(
-    "Local file navigation can expose filesystem content"
-  );
-  await harness.controller.resolveApproval(requested.request.id, false);
-  await agent.waitForIdle();
+  expect(requested).toBeUndefined();
   const result = agent.toolResults.at(-1) as {ok: boolean; error?: string};
   expect(result.ok).toBe(false);
-  expect(result.error).toBe("User denied action");
+  expect(result.error).toBe(
+    "Local file navigation is outside the managed browser session"
+  );
   const started = harness.events.find(
     event =>
       event.type === "playwright_started" &&
