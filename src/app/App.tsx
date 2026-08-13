@@ -79,6 +79,7 @@ export function App(props: {
     () => buildTimelineItems(state.events),
     [state.events]
   );
+  const agentActive = state.activeTurnIds.length > 0;
   const activity = selectAgentActivity(state, props.config.provider);
   const currentModel = state.currentModel ?? props.config.model;
   const {modelPicker, openModelPicker, handleModelPickerInput} = useModelPicker(
@@ -92,7 +93,8 @@ export function App(props: {
     hasActivity: Boolean(activity),
     commandMatchCount: commandMatches.length,
     modelPickerCount: modelPicker?.models.length,
-    pendingApproval: Boolean(state.pendingApproval)
+    pendingApproval: Boolean(state.pendingApproval),
+    composerInput: state.input
   });
 
   useEffect(() => {
@@ -117,6 +119,10 @@ export function App(props: {
       const scroller = transcriptScrollRef.current;
       if (key.pageUp) scroller?.pageUp();
       else scroller?.pageDown();
+      return;
+    }
+    if (key.escape && agentActive) {
+      void runtimeRef.current?.interrupt().catch(reportHostError);
       return;
     }
     if (handleModelPickerInput(key)) return;
@@ -177,7 +183,12 @@ export function App(props: {
                   </Text>
                 </Box>
               ) : null}
-              {layout.showActionBar ? <ActionBar input={state.input} /> : null}
+              {layout.showActionBar ? (
+                <ActionBar
+                  input={state.input}
+                  maxHeight={layout.actionBarHeight}
+                />
+              ) : null}
               {modelPicker ? (
                 <ModelPicker
                   models={modelPicker.models}
@@ -193,6 +204,8 @@ export function App(props: {
               ) : (
                 <Composer
                   input={state.input}
+                  height={layout.composerHeight}
+                  compact={layout.compactComposer}
                   disabled={state.status !== "running"}
                   onChange={input => dispatch({type: "input", input})}
                   onSubmit={sendMessage}
@@ -216,6 +229,7 @@ export function App(props: {
           status={state.status}
           pageUrl={state.latestPageUrl}
           model={currentModel}
+          agentActive={agentActive}
         />
       </Box>
     </GraphicsProvider>

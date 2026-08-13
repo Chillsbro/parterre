@@ -32,6 +32,26 @@ test("ignores resolutions for unknown requests", async () => {
   expect(events).toEqual([]);
 });
 
+test("records an interrupted approval as a denial", async () => {
+  const {gate, events} = createGate();
+  const controller = new AbortController();
+  const pending = gate.request(
+    {id: "request-1", command: "cookie-clear", args: []},
+    "Sensitive",
+    controller.signal
+  );
+  await new Promise(resolve => setTimeout(resolve, 1));
+
+  controller.abort();
+
+  expect(await pending).toBe(false);
+  expect(events.map(event => event.type)).toEqual([
+    "approval_requested",
+    "approval_resolved"
+  ]);
+  expect(events.at(-1)).toMatchObject({approved: false});
+});
+
 test("abandoning denies every pending approval", async () => {
   const {gate} = createGate();
   const first = gate.request(

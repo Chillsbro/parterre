@@ -21,6 +21,9 @@ const options: AgentFactoryOptions = {
 const handle: AgentHandle = {
   async send() {},
   async sendAndWait() {},
+  async interrupt() {
+    return false;
+  },
   async listModels() {
     return [];
   },

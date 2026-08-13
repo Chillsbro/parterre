@@ -17,6 +17,7 @@ export interface RuntimeController {
     waitForResponse?: boolean,
     displayContent?: string
   ): Promise<void>;
+  interrupt(): Promise<boolean>;
   resolveApproval(requestId: string, approved: boolean): Promise<void>;
   listModels(): Promise<ModelChoice[]>;
   setModel(modelId: string): Promise<void>;

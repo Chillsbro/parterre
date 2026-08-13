@@ -28,6 +28,21 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
       });
       continue;
     }
+    if (event.type === "agent_interrupted") {
+      items.push({
+        id: `${event.turnId}-interrupted`,
+        kind: "tool",
+        content: "Agent interrupted",
+        ok: true
+      });
+      continue;
+    }
+    if (
+      event.type === "agent_turn_started" ||
+      event.type === "agent_turn_finished"
+    ) {
+      continue;
+    }
     if (event.type === "playwright_finished") {
       items.push({
         id: event.result.request.id,
@@ -46,6 +61,30 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
           ok: true
         });
       }
+      continue;
+    }
+    if (event.type === "target_test_finished") {
+      if (!event.result.ok) {
+        items.push({
+          id: `${event.timestamp}-target-test`,
+          kind: "error",
+          content: event.result.error
+        });
+        continue;
+      }
+      items.push({
+        id: `${event.timestamp}-target-test`,
+        kind: "tool",
+        content: "Automation test written — view ",
+        detail: event.result.timedOut
+          ? `timed out (exit ${event.result.exitCode})`
+          : `exit ${event.result.exitCode}`,
+        link: {
+          label: event.result.path,
+          href: pathToFileURL(event.result.path).href
+        },
+        ok: event.result.passed
+      });
       continue;
     }
     if (event.type !== "agent_message") continue;

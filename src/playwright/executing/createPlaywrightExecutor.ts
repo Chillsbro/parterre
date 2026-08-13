@@ -12,6 +12,7 @@ export interface PlaywrightSessionOptions {
 
 export interface PlaywrightExecutionOptions {
   videoRecordingPath?: string | undefined;
+  signal?: AbortSignal | undefined;
 }
 
 export type PlaywrightExecutor = (

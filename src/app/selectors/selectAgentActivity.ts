@@ -17,7 +17,7 @@ export function selectAgentActivity(
     return `Connecting to ${providerLabels[provider]}`;
   }
   if (state.status !== "running") return undefined;
-  if (!state.awaitingResponse) return undefined;
+  if (state.activeTurnIds.length === 0) return undefined;
 
   const activeRequest = state.activeRequests.at(-1);
   if (activeRequest) return `Using browser / ${activeRequest.command}`;

@@ -19,6 +19,7 @@ export interface ScriptedAgent {
   prompts: string[];
   toolResults: unknown[];
   modelChanges: string[];
+  interruptions: number;
   waitForIdle(): Promise<void>;
 }
 
@@ -29,6 +30,7 @@ export function createScriptedAgent(
   const prompts: string[] = [];
   const toolResults: unknown[] = [];
   const modelChanges: string[] = [];
+  let interruptions = 0;
   let queue: Promise<void> = Promise.resolve();
 
   const factory: AgentFactory = async (options: AgentFactoryOptions) => {
@@ -63,7 +65,7 @@ export function createScriptedAgent(
     };
     return {
       async send(prompt: string): Promise<void> {
-        enqueue(prompt).catch(error => {
+        await enqueue(prompt).catch(error => {
           options.handlers.onSessionError(
             error instanceof Error ? error.message : String(error),
             new Date().toISOString()
@@ -72,6 +74,10 @@ export function createScriptedAgent(
       },
       async sendAndWait(prompt: string): Promise<void> {
         await enqueue(prompt);
+      },
+      async interrupt(): Promise<boolean> {
+        interruptions += 1;
+        return false;
       },
       async listModels() {
         return [{id: "scripted-model", name: "Scripted Model"}];
@@ -91,6 +97,9 @@ export function createScriptedAgent(
     prompts,
     toolResults,
     modelChanges,
+    get interruptions() {
+      return interruptions;
+    },
     waitForIdle: () => queue
   };
 }

@@ -7,7 +7,11 @@ interface PendingApproval {
 }
 
 export interface ApprovalGate {
-  request(request: PlaywrightRequest, reason: string): Promise<boolean>;
+  request(
+    request: PlaywrightRequest,
+    reason: string,
+    signal?: AbortSignal
+  ): Promise<boolean>;
   resolve(requestId: string, approved: boolean): Promise<void>;
   abandonAll(): void;
 }
@@ -16,8 +20,8 @@ export function createApprovalGate(
   publish: (event: SessionEvent) => Promise<void>
 ): ApprovalGate {
   const pending = new Map<string, PendingApproval>();
-  return {
-    async request(request, reason) {
+  const gate: ApprovalGate = {
+    async request(request, reason, signal) {
       const decision = new Promise<boolean>(resolve => {
         pending.set(request.id, {request, resolve});
       });
@@ -27,6 +31,17 @@ export function createApprovalGate(
         request,
         reason
       });
+      if (signal?.aborted) {
+        await gate.resolve(request.id, false);
+      } else {
+        signal?.addEventListener(
+          "abort",
+          () => {
+            void gate.resolve(request.id, false);
+          },
+          {once: true}
+        );
+      }
       return decision;
     },
     async resolve(requestId, approved) {
@@ -48,4 +63,5 @@ export function createApprovalGate(
       pending.clear();
     }
   };
+  return gate;
 }

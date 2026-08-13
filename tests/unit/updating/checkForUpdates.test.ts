@@ -4,6 +4,7 @@ import {mkdir, mkdtemp, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {fileURLToPath} from "node:url";
+import packageMetadata from "../../../package.json" with {type: "json"};
 import {
   compareReleaseVersions,
   fetchLatestRelease,
@@ -165,7 +166,7 @@ test("reports installer metadata before the source package version", async () =>
   } finally {
     await rm(root, {recursive: true, force: true});
   }
-  expect(await getParterreVersion([])).toBe("v0.2.1");
+  expect(await getParterreVersion([])).toBe(`v${packageMetadata.version}`);
 });
 
 test("discovers metadata only for an installer-managed release", async () => {

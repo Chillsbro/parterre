@@ -103,6 +103,22 @@ test("keeps oddly spaced pasted code compact and submits it unchanged", async ()
   app.unmount();
 });
 
+test("expands the composer as typed text wraps", async () => {
+  const runtime = createScriptedRuntime();
+  const app = renderApp(runtime);
+  await app.ready();
+  const draft = "expandme".repeat(13);
+
+  app.stdin.write(draft);
+  await waitFor(() => app.frame().includes("expandme"));
+
+  const frame = Bun.stripANSI(app.frame());
+  const draftRows = frame.split("\n").filter(line => line.includes("expandme"));
+  expect(draftRows.length).toBeGreaterThan(1);
+  expect(frame.split("\n")).toHaveLength(24);
+  app.unmount();
+});
+
 test("narrows the command menu while typing a slash command", async () => {
   const runtime = createScriptedRuntime();
   const app = renderApp(runtime);
@@ -138,6 +154,28 @@ test("shows the approval dialog and resolves it from a keypress", async () => {
   expect(runtime.approvals).toEqual([
     {requestId: "approval-1", approved: false}
   ]);
+  app.unmount();
+});
+
+test("interrupts an active agent turn with Escape", async () => {
+  const runtime = createScriptedRuntime();
+  const app = renderApp(runtime);
+  await app.ready();
+  runtime.emit({
+    type: "agent_turn_started",
+    timestamp: new Date().toISOString(),
+    turnId: "active-turn"
+  });
+  await waitFor(() => app.frame().includes("Thinking"));
+  expect(app.frame()).toContain("esc interrupt");
+
+  app.stdin.write("\u001b");
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  expect(runtime.interruptionCount()).toBe(1);
+  expect(app.frame()).toContain("Agent interrupted");
+  expect(app.frame()).not.toContain("Thinking");
+  expect(app.frame()).not.toContain("esc interrupt");
   app.unmount();
 });
 

@@ -23,6 +23,11 @@ test("describes active browser work", () => {
       content: "Open the page"
     },
     {
+      type: "agent_turn_started",
+      timestamp: "2026-01-01T00:00:00.050Z",
+      turnId: "user-1"
+    },
+    {
       type: "playwright_started",
       timestamp: "2026-01-01T00:00:00.100Z",
       request: {id: "request-1", command: "open", args: []}
@@ -50,6 +55,11 @@ test("falls back to thinking once browser work finishes", () => {
       content: "Open the page"
     },
     {
+      type: "agent_turn_started",
+      timestamp: "2026-01-01T00:00:00.050Z",
+      turnId: "user-1"
+    },
+    {
       type: "playwright_started",
       timestamp: "2026-01-01T00:00:00.100Z",
       request
@@ -69,7 +79,7 @@ test("falls back to thinking once browser work finishes", () => {
   expect(selectAgentActivity(state, "copilot")).toBe("Thinking");
 });
 
-test("returns nothing after the assistant replies", () => {
+test("returns nothing after the agent turn finishes", () => {
   const state = stateFromEvents([
     {
       type: "user_message",
@@ -78,9 +88,19 @@ test("returns nothing after the assistant replies", () => {
       content: "Open the page"
     },
     {
+      type: "agent_turn_started",
+      timestamp: "2026-01-01T00:00:00.500Z",
+      turnId: "user-1"
+    },
+    {
       type: "agent_message",
       timestamp: "2026-01-01T00:00:01.000Z",
       message: {type: "assistant_message", id: "assistant-1", content: "Done"}
+    },
+    {
+      type: "agent_turn_finished",
+      timestamp: "2026-01-01T00:00:01.100Z",
+      turnId: "user-1"
     }
   ]);
   expect(selectAgentActivity(state, "copilot")).toBeUndefined();

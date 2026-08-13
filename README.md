@@ -21,6 +21,7 @@ One terminal, the whole session:
 
 - live Chromium, rendered beside the conversation;
 - a timed trace of every browser action;
+- manual browser workflows turned into tests in your target repo;
 - approvals before sensitive changes;
 - session replay and local codebase profiles.
 
@@ -101,7 +102,7 @@ Type `/` and the command menu narrows as you type:
 
 | Command | What happens |
 | --- | --- |
-| `/test <workflow>` | Runs a browser workflow and reports failures and final state |
+| `/test <workflow>` | Proves a browser workflow, writes its automation into the target repo, and runs the repo's test command |
 | `/inspect <target>` | Structure, accessibility, console errors, and network activity |
 | `/learn [path]` | Learns a codebase's conventions locally; use `refresh` to re-learn |
 | `/model [id]` | Switches models mid-conversation. Opens a picker when no id is given; history is preserved |
@@ -110,6 +111,14 @@ Type `/` and the command menu narrows as you type:
 
 Sensitive browser actions pause for approval. Unknown commands are rejected;
 the agent only receives an allowlisted Playwright interface.
+Press `Esc` while the agent is working to interrupt its current turn without
+ending the session.
+
+The directory passed with `--workspace` is the target repo. Parterre uses its
+existing test convention (`bun test`, `npm test`, `cargo test`, `go test`,
+`pytest`, and similar entrypoints) to judge generated automation by exit code.
+It will not replace an existing file: during one session, it may only revise a
+test file that it created itself.
 
 ## Render quality
 

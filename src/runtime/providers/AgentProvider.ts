@@ -6,7 +6,7 @@ export interface AgentToolDefinition {
   name: string;
   description: string;
   schema: z.ZodRawShape;
-  handler(input: unknown): Promise<unknown>;
+  handler(input: unknown, context?: {signal: AbortSignal}): Promise<unknown>;
 }
 
 export interface AgentEventHandlers {
@@ -18,6 +18,7 @@ export interface AgentEventHandlers {
 export interface AgentHandle {
   send(prompt: string): Promise<void>;
   sendAndWait(prompt: string): Promise<void>;
+  interrupt(): Promise<boolean>;
   listModels(): Promise<ModelChoice[]>;
   setModel(modelId: string): Promise<void>;
   disconnect(): Promise<void>;

@@ -2,6 +2,7 @@ import {expect, test} from "bun:test";
 import {renderToString} from "ink";
 import {
   Composer,
+  computeComposerLayout,
   shouldCompactComposer
 } from "../../../src/components/index.js";
 
@@ -16,6 +17,8 @@ test("uses a compact preview only for large or unusually spaced drafts", () => {
   const output = renderToString(
     <Composer
       input={input}
+      height={3}
+      compact
       disabled={false}
       onChange={() => {}}
       onSubmit={() => {}}
@@ -25,4 +28,23 @@ test("uses a compact preview only for large or unusually spaced drafts", () => {
   expect(Bun.stripANSI(output).split("\n")).toHaveLength(3);
   expect(output).toContain(`Large input · 3 lines · ${input.length} chars`);
   expect(output).not.toContain("return x");
+});
+
+test("computes additional composer rows for wrapped and multiline drafts", () => {
+  expect(computeComposerLayout("short", 44)).toEqual({
+    height: 3,
+    compact: false
+  });
+  expect(computeComposerLayout("a".repeat(39), 44)).toEqual({
+    height: 4,
+    compact: false
+  });
+  expect(computeComposerLayout("first\nsecond", 44)).toEqual({
+    height: 4,
+    compact: false
+  });
+  expect(computeComposerLayout("a".repeat(267), 44)).toEqual({
+    height: 3,
+    compact: true
+  });
 });
