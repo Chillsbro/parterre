@@ -170,3 +170,105 @@ test("settles a dequeued Claude prompt after cancelling its interrupted batch", 
 
   await agent.disconnect();
 });
+
+test("resumes Claude natively and persists the initialized session identity", async () => {
+  const prompts: string[] = [];
+  const queryOptions: unknown[] = [];
+  const identities: unknown[] = [];
+  const output: unknown[] = [];
+  let closed = false;
+  let wake = (): void => {};
+  const query = ({
+    prompt,
+    options
+  }: {
+    prompt: AsyncIterable<unknown>;
+    options: unknown;
+  }) => {
+    queryOptions.push(options);
+    output.push({
+      type: "system",
+      subtype: "init",
+      session_id: "claude-authoritative",
+      model: "claude-sonnet"
+    });
+    void (async () => {
+      for await (const message of prompt) {
+        prompts.push((message as {message: {content: string}}).message.content);
+        output.push({type: "result", subtype: "success"});
+        wake();
+      }
+    })();
+    return {
+      async *[Symbol.asyncIterator]() {
+        while (!closed || output.length > 0) {
+          if (output.length === 0) {
+            await new Promise<void>(resolve => {
+              wake = resolve;
+            });
+          }
+          const next = output.shift();
+          if (next) yield next;
+        }
+      },
+      async accountInfo() {
+        return {email: "fixture@example.com"};
+      },
+      async interrupt() {},
+      async supportedModels() {
+        return [];
+      },
+      async setModel() {},
+      close() {
+        closed = true;
+        wake();
+      }
+    };
+  };
+  const adapter = {
+    createSdkMcpServer: (server: unknown) => server,
+    query,
+    tool: (
+      _name: string,
+      _description: string,
+      _schema: unknown,
+      handler: unknown
+    ) => handler
+  } as unknown as Pick<
+    typeof import("@anthropic-ai/claude-agent-sdk"),
+    "createSdkMcpServer" | "query" | "tool"
+  >;
+  const options: AgentFactoryOptions = {
+    sessionId: "parterre-session",
+    model: "auto",
+    workspace: "/workspace",
+    systemPromptAppend: "Use Parterre tools.",
+    resume: {
+      conversationId: "claude-saved",
+      history: [{role: "user", content: "old request"}]
+    },
+    tools: [],
+    handlers: {
+      onAssistantDelta() {},
+      onAssistantMessage() {},
+      onSessionError() {},
+      async onSessionIdentity(identity) {
+        identities.push(identity);
+      }
+    }
+  };
+
+  const agent = await createClaudeAgent(options, adapter);
+  await agent.sendAndWait("continue");
+  await agent.disconnect();
+
+  expect(queryOptions[0]).toMatchObject({resume: "claude-saved"});
+  expect(prompts).toEqual(["continue"]);
+  expect(identities).toEqual([
+    {
+      provider: "claude",
+      conversationId: "claude-authoritative",
+      model: "claude-sonnet"
+    }
+  ]);
+});

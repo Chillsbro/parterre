@@ -8,7 +8,8 @@ import type {RuntimeContext} from "../types/index.js";
 
 export async function stopSessionRuntime(
   context: RuntimeContext,
-  agent: AgentHandle
+  agent: AgentHandle,
+  requestedStatus: "stopped" | "failed" = "stopped"
 ): Promise<void> {
   const cleanupErrors: unknown[] = [];
   context.approvals.abandonAll();
@@ -22,14 +23,16 @@ export async function stopSessionRuntime(
     playwrightSession: context.playwrightSession
   }).catch(error => cleanupErrors.push(error));
 
-  const status = cleanupErrors.length === 0 ? "stopped" : "failed";
+  const status = cleanupErrors.length === 0 ? requestedStatus : "failed";
   await context
     .publish({
       type: "session_stopped",
       timestamp: new Date().toISOString(),
       message:
         cleanupErrors.length === 0
-          ? "Session stopped"
+          ? requestedStatus === "failed"
+            ? "Session startup failed and resources were released"
+            : "Session stopped"
           : "Session stopped with cleanup errors"
     })
     .catch(error => cleanupErrors.push(error));
@@ -38,6 +41,9 @@ export async function stopSessionRuntime(
     context.sessionId,
     status
   ).catch(error => cleanupErrors.push(error));
+  await context
+    .releaseSessionLease?.()
+    .catch(error => cleanupErrors.push(error));
   try {
     closeSessionDatabase(context.config.storageDir);
   } catch (error) {

@@ -25,3 +25,15 @@ test("shows only the status line while starting", () => {
   expect(output).toContain("Raising the curtain");
   expect(output).not.toContain("Could not start");
 });
+
+test("shows the browser profile warning during resume startup", () => {
+  const output = renderToString(
+    <StartupScreen
+      status="starting"
+      errorMessage={undefined}
+      notice="Warning: authenticated website state may be restored."
+      onComplete={() => {}}
+    />
+  );
+  expect(output).toContain("authenticated website state may be restored");
+});

@@ -34,6 +34,8 @@ function createHarness(authenticated = true, blockFirstTurn = false) {
   const messages: string[] = [];
   const clientOptions: unknown[] = [];
   const threadOptions: unknown[] = [];
+  const resumedIds: string[] = [];
+  const identities: unknown[] = [];
   const toolNames: string[] = [];
   let toolServerClosed = false;
   const turnSignals: AbortSignal[] = [];
@@ -53,49 +55,59 @@ function createHarness(authenticated = true, blockFirstTurn = false) {
     handlers: {
       onAssistantDelta() {},
       onAssistantMessage: (_id, content) => messages.push(content),
-      onSessionError() {}
+      onSessionError() {},
+      async onSessionIdentity(identity) {
+        identities.push(identity);
+      }
     }
   };
   const dependencies = {
     isAuthenticated: async () => authenticated,
     createClient: (clientOption: unknown) => {
       clientOptions.push(clientOption);
-      return {
-        startThread(threadOption: unknown) {
-          threadOptions.push(threadOption);
-          return {
-            async runStreamed(
-              prompt: string,
-              turnOptions?: {signal?: AbortSignal}
+      const createThread = (threadOption: unknown) => {
+        threadOptions.push(threadOption);
+        return {
+          id: null,
+          async runStreamed(
+            prompt: string,
+            turnOptions?: {signal?: AbortSignal}
+          ) {
+            prompts.push(prompt);
+            if (turnOptions?.signal) turnSignals.push(turnOptions.signal);
+            if (
+              blockFirstTurn &&
+              prompt.includes("keep working") &&
+              turnOptions?.signal
             ) {
-              prompts.push(prompt);
-              if (turnOptions?.signal) turnSignals.push(turnOptions.signal);
-              if (
-                blockFirstTurn &&
-                prompt.includes("keep working") &&
-                turnOptions?.signal
-              ) {
-                return {events: waitForAbort(turnOptions.signal)};
-              }
-              return {
-                events: events([
-                  {
-                    type: "item.completed",
-                    item: {id: "reply-1", type: "agent_message", text: "done"}
-                  },
-                  {
-                    type: "turn.completed",
-                    usage: {
-                      input_tokens: 1,
-                      cached_input_tokens: 0,
-                      output_tokens: 1,
-                      reasoning_output_tokens: 0
-                    }
-                  }
-                ])
-              };
+              return {events: waitForAbort(turnOptions.signal)};
             }
-          };
+            return {
+              events: events([
+                {type: "thread.started", thread_id: "thread-new"},
+                {
+                  type: "item.completed",
+                  item: {id: "reply-1", type: "agent_message", text: "done"}
+                },
+                {
+                  type: "turn.completed",
+                  usage: {
+                    input_tokens: 1,
+                    cached_input_tokens: 0,
+                    output_tokens: 1,
+                    reasoning_output_tokens: 0
+                  }
+                }
+              ])
+            };
+          }
+        };
+      };
+      return {
+        startThread: createThread,
+        resumeThread: (id: string, threadOption: unknown) => {
+          resumedIds.push(id);
+          return createThread(threadOption);
         }
       };
     },
@@ -116,6 +128,8 @@ function createHarness(authenticated = true, blockFirstTurn = false) {
     messages,
     clientOptions,
     threadOptions,
+    resumedIds,
+    identities,
     toolNames,
     turnSignals,
     toolServerClosed: () => toolServerClosed
@@ -127,6 +141,45 @@ test("rejects an unauthenticated Codex account before starting tools", async () 
   expect(
     createCodexAgent(harness.options, harness.dependencies)
   ).rejects.toThrow("codex login");
+});
+
+test("resumes a native Codex thread without reinjecting prior context", async () => {
+  const harness = createHarness();
+  harness.options.resume = {
+    conversationId: "thread-existing",
+    history: [{role: "user", content: "old request"}]
+  };
+  const agent = await createCodexAgent(harness.options, harness.dependencies);
+
+  await agent.sendAndWait("continue");
+  await agent.disconnect();
+
+  expect(harness.resumedIds).toEqual(["thread-existing"]);
+  expect(harness.prompts).toEqual(["continue"]);
+  expect(harness.identities[0]).toEqual({
+    provider: "codex",
+    conversationId: "thread-existing"
+  });
+});
+
+test("injects bounded history once when Codex has no native thread", async () => {
+  const harness = createHarness();
+  harness.options.resume = {
+    history: [{role: "user", content: "old request"}]
+  };
+  const agent = await createCodexAgent(harness.options, harness.dependencies);
+
+  await agent.sendAndWait("continue");
+  await agent.sendAndWait("then summarize");
+  await agent.disconnect();
+
+  expect(harness.prompts[0]).toContain('"old request"');
+  expect(harness.prompts[0]).toContain("Use Parterre tools.");
+  expect(harness.prompts[1]).toBe("then summarize");
+  expect(harness.identities).toContainEqual({
+    provider: "codex",
+    conversationId: "thread-new"
+  });
 });
 
 test("cancels a queued Codex turn before it starts", async () => {

@@ -34,6 +34,7 @@ import {appReducer, initialAppState} from "./state/index.js";
 
 export function App(props: {
   config: AppConfig;
+  resumeSessionId?: string | undefined;
   graphics: TerminalGraphicsInfo;
   subscribeWheel?:
     | ((listener: (event: MouseWheelEvent) => void) => () => void)
@@ -73,7 +74,8 @@ export function App(props: {
     props.config,
     dispatch,
     props.createRuntime,
-    liveView?.frames
+    liveView?.frames,
+    props.resumeSessionId
   );
   const timelineItems = useMemo(
     () => buildTimelineItems(state.events),
@@ -154,6 +156,11 @@ export function App(props: {
         status={state.status}
         errorMessage={
           state.status === "failed" ? state.lastProcessError : undefined
+        }
+        notice={
+          props.resumeSessionId
+            ? "Warning: resuming this persistent browser profile may restore authenticated website state."
+            : undefined
         }
         onComplete={() => setShowStartup(false)}
       />

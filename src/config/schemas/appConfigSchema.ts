@@ -10,7 +10,8 @@ export const appConfigSchema = z
     storageDir: z.string().min(1),
     playwrightCommand: z.string().min(1),
     redactions: z.array(z.string()).default([]),
-    baseUrl: z.string().min(1).optional()
+    baseUrl: z.string().min(1).optional(),
+    allowUnverifiedRedactions: z.boolean().optional()
   })
   .refine(config => config.provider !== "openai" || Boolean(config.baseUrl), {
     message:

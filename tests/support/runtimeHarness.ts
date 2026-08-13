@@ -35,6 +35,7 @@ export function playwrightCliPath(): string {
 export async function startRuntimeHarness(options: {
   agentFactory?: AgentFactory;
   config?: Partial<AppConfig>;
+  resumeSessionId?: string | undefined;
 }): Promise<RuntimeHarness> {
   const storageDir = await mkdtemp(join(tmpdir(), "parterre-harness-"));
   const config: AppConfig = {
@@ -54,6 +55,9 @@ export async function startRuntimeHarness(options: {
   const controller = await createSessionRuntime({
     config,
     ...(options.agentFactory ? {agentFactory: options.agentFactory} : {}),
+    ...(options.resumeSessionId
+      ? {resumeSessionId: options.resumeSessionId}
+      : {}),
     onNotification: notification => {
       if (notification.type === "event") events.push(notification.event);
       if (notification.type === "liveFrame") frames.push(notification.path);

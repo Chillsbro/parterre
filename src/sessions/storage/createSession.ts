@@ -19,8 +19,8 @@ export async function createSession(
   openSessionDatabase(storageDir)
     .query(
       `INSERT OR REPLACE INTO sessions
-        (id, schemaVersion, createdAt, updatedAt, workspace, agent, model, playwrightSession, status)
-       VALUES ($id, $schemaVersion, $createdAt, $updatedAt, $workspace, $agent, $model, $playwrightSession, $status)`
+        (id, schemaVersion, createdAt, updatedAt, workspace, agent, model, playwrightSession, status, providerSessionId, baseUrl, resumeCount, redactionCount, redactionVerifiers)
+       VALUES ($id, $schemaVersion, $createdAt, $updatedAt, $workspace, $agent, $model, $playwrightSession, $status, $providerSessionId, $baseUrl, $resumeCount, $redactionCount, $redactionVerifiers)`
     )
     .run({
       $id: metadata.id,
@@ -31,6 +31,13 @@ export async function createSession(
       $agent: metadata.agent,
       $model: metadata.model,
       $playwrightSession: metadata.playwrightSession,
-      $status: metadata.status
+      $status: metadata.status,
+      $providerSessionId: metadata.providerSessionId ?? null,
+      $baseUrl: metadata.baseUrl ?? null,
+      $resumeCount: metadata.resumeCount ?? 0,
+      $redactionCount: metadata.redactionCount ?? 0,
+      $redactionVerifiers: metadata.redactionVerifiers
+        ? JSON.stringify(metadata.redactionVerifiers)
+        : null
     });
 }

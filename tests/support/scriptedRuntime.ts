@@ -84,6 +84,12 @@ export function createScriptedRuntime(options?: {
           model: modelId
         });
       },
+      async clearTranscript() {
+        emit({
+          type: "transcript_cleared",
+          timestamp: new Date().toISOString()
+        });
+      },
       authorizeCodebaseRoot(path) {
         return resolve(path);
       },

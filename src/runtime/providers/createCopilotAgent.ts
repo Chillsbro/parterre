@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import type {CopilotClient as CopilotClientType} from "@github/copilot-sdk";
 import {z} from "zod";
 import type {AgentFactoryOptions, AgentHandle} from "./AgentProvider.js";
@@ -6,6 +7,7 @@ import {
   bindToolsToActiveTurn,
   createAgentTurnQueue
 } from "./createAgentTurnQueue.js";
+import {formatResumedPrompt} from "./formatResumedPrompt.js";
 import {isCliStartTimeout} from "./isCliStartTimeout.js";
 
 const maxStartAttempts = 3;
@@ -58,8 +60,7 @@ export async function createCopilotAgent(
           ". Run `bunx @github/copilot` and use /login to sign in — an active Copilot subscription is required (or set GH_TOKEN) — then start Parterre again."
       );
     }
-    const session = await client.createSession({
-      sessionId: options.sessionId,
+    const sessionConfig = {
       model: options.model,
       streaming: true,
       tools: tools.map(definition =>
@@ -77,6 +78,35 @@ export async function createCopilotAgent(
       ),
       onPermissionRequest: approveAll,
       systemMessage: {mode: "append", content: options.systemPromptAppend}
+    } as const;
+    const conversationId =
+      options.resume?.conversationId ??
+      (options.resume ? randomUUID() : options.sessionId);
+    const session = options.resume?.conversationId
+      ? await client.resumeSession(conversationId, {
+          ...sessionConfig,
+          continuePendingWork: false
+        })
+      : await client.createSession({
+          ...sessionConfig,
+          sessionId: conversationId
+        });
+    const lifecycleEvents =
+      "getEvents" in session && typeof session.getEvents === "function"
+        ? await session.getEvents().catch(() => [])
+        : [];
+    const lifecycle = [...lifecycleEvents]
+      .reverse()
+      .find(
+        event =>
+          event.type === "session.start" || event.type === "session.resume"
+      );
+    await options.handlers.onSessionIdentity?.({
+      provider: "copilot",
+      conversationId: session.sessionId,
+      ...(lifecycle?.data.selectedModel
+        ? {model: lifecycle.data.selectedModel}
+        : {})
     });
 
     session.on("assistant.message_delta", event => {
@@ -97,8 +127,16 @@ export async function createCopilotAgent(
       options.handlers.onSessionError(event.data.message, event.timestamp);
     });
 
+    let firstTurn = Boolean(options.resume && !options.resume.conversationId);
     const send = (prompt: string): Promise<void> =>
-      turns.enqueue(() => session.sendAndWait({prompt}).then(() => {}));
+      turns.enqueue(() => {
+        const input =
+          firstTurn && options.resume
+            ? formatResumedPrompt(prompt, options.resume.history)
+            : prompt;
+        firstTurn = false;
+        return session.sendAndWait({prompt: input}).then(() => {});
+      });
 
     return {
       async send(prompt: string): Promise<void> {

@@ -40,6 +40,35 @@ export function loadCliCommand(argv: string[]): CliCommand {
     };
   }
 
+  if (subcommand === "resume") {
+    const {values, positionals} = parseArgs({
+      args: remainingArgs,
+      allowPositionals: true,
+      options: {
+        storage: {type: "string"},
+        playwright: {type: "string"},
+        redact: {type: "string", multiple: true},
+        "base-url": {type: "string"},
+        "allow-unverified-redactions": {type: "boolean"}
+      },
+      strict: true
+    });
+    const sessionId = positionals[0];
+    if (!sessionId) throw new Error("resume requires a session ID");
+    if (positionals.length > 1) {
+      throw new Error("resume accepts exactly one session ID");
+    }
+    return {
+      name: "resume",
+      sessionId,
+      storageDir: resolve(values.storage ?? defaultStorageDir),
+      playwrightCommand: values.playwright ?? getDefaultPlaywrightCommand(),
+      redactions: values.redact ?? [],
+      allowUnverifiedRedactions: values["allow-unverified-redactions"] ?? false,
+      ...(values["base-url"] ? {baseUrl: values["base-url"]} : {})
+    };
+  }
+
   if (subcommand !== "run") return {name: "help"};
 
   const {values} = parseArgs({

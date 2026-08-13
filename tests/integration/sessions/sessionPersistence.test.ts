@@ -37,7 +37,7 @@ test("persists what the user saw across a database reopen, with secrets redacted
     expect(sessions).toHaveLength(1);
     const session = sessions[0]!;
     expect(session.status).toBe("stopped");
-    expect(session.model).toBe("auto");
+    expect(session.model).toBe("fixture-model");
 
     const persisted = await readSessionEvents(storageDir, session.id);
     expect(persisted.some(event => event.type === "session_started")).toBe(

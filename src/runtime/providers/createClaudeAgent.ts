@@ -6,6 +6,7 @@ import {
   bindToolsToActiveTurn,
   createAgentTurnQueue
 } from "./createAgentTurnQueue.js";
+import {formatResumedPrompt} from "./formatResumedPrompt.js";
 import {isClaudeAuthenticated} from "./isClaudeAuthenticated.js";
 
 const mcpServerName = "parterre";
@@ -74,6 +75,9 @@ export async function createClaudeAgent(
     prompt: userMessages(),
     options: {
       cwd: options.workspace,
+      ...(options.resume?.conversationId
+        ? {resume: options.resume.conversationId}
+        : {}),
       ...(options.model !== "auto" ? {model: options.model} : {}),
       mcpServers: {[mcpServerName]: server},
       tools: [],
@@ -100,12 +104,22 @@ export async function createClaudeAgent(
   let settleCurrentTurn: (() => void) | undefined;
   let currentTurnSignal: AbortSignal | undefined;
   let currentTurnMessageUuid: ReturnType<typeof randomUUID> | undefined;
+  let identityReported = false;
 
   const consume = (async () => {
     try {
       for await (const message of agentQuery) {
         const timestamp = new Date().toISOString();
-        if (message.type === "assistant") {
+        if (message.type === "system" && message.subtype === "init") {
+          if (!identityReported) {
+            identityReported = true;
+            await options.handlers.onSessionIdentity?.({
+              provider: "claude",
+              conversationId: message.session_id,
+              model: message.model
+            });
+          }
+        } else if (message.type === "assistant") {
           const text = message.message.content
             .flatMap(block => (block.type === "text" ? [block.text] : []))
             .join("");
@@ -131,6 +145,7 @@ export async function createClaudeAgent(
     }
   })();
 
+  let firstTurn = Boolean(options.resume && !options.resume.conversationId);
   const send = (prompt: string): Promise<void> =>
     turns.enqueue(async signal => {
       currentTurnSignal = signal;
@@ -138,7 +153,12 @@ export async function createClaudeAgent(
       const done = new Promise<void>(resolve => {
         settleCurrentTurn = resolve;
       });
-      push(prompt, currentTurnMessageUuid);
+      const input =
+        firstTurn && options.resume
+          ? formatResumedPrompt(prompt, options.resume.history)
+          : prompt;
+      firstTurn = false;
+      push(input, currentTurnMessageUuid);
       await done;
       settleCurrentTurn = undefined;
       currentTurnSignal = undefined;

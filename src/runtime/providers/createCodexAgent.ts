@@ -11,6 +11,7 @@ import {
   bindToolsToActiveTurn,
   createAgentTurnQueue
 } from "./createAgentTurnQueue.js";
+import {formatResumedPrompt} from "./formatResumedPrompt.js";
 import {isCodexAuthenticated} from "./isCodexAuthenticated.js";
 
 interface ToolServer {
@@ -19,6 +20,7 @@ interface ToolServer {
 }
 
 interface CodexThread {
+  readonly id: string | null;
   runStreamed(
     prompt: string,
     options?: {signal?: AbortSignal}
@@ -27,6 +29,7 @@ interface CodexThread {
 
 interface CodexClient {
   startThread(options: ThreadOptions): CodexThread;
+  resumeThread(id: string, options: ThreadOptions): CodexThread;
 }
 
 interface CodexAgentDependencies {
@@ -143,28 +146,48 @@ export async function createCodexAgent(
         }
       }
     });
-    thread = codex.startThread({
+    const threadOptions: ThreadOptions = {
       workingDirectory: options.workspace,
       skipGitRepoCheck: true,
       sandboxMode: "read-only",
       approvalPolicy: "never",
       ...(options.model !== "auto" ? {model: options.model} : {})
-    });
+    };
+    thread = options.resume?.conversationId
+      ? codex.resumeThread(options.resume.conversationId, threadOptions)
+      : codex.startThread(threadOptions);
+    if (options.resume?.conversationId) {
+      await options.handlers.onSessionIdentity?.({
+        provider: "codex",
+        conversationId: options.resume.conversationId
+      });
+    }
   } catch (error) {
     await toolServer.close();
     throw error;
   }
-  let firstTurn = true;
+  let firstTurn = !options.resume?.conversationId;
+  let identityReported = Boolean(options.resume?.conversationId);
 
   const run = async (prompt: string, signal: AbortSignal): Promise<void> => {
+    const resumedPrompt =
+      firstTurn && options.resume
+        ? formatResumedPrompt(prompt, options.resume.history)
+        : prompt;
     const input = firstTurn
-      ? `${options.systemPromptAppend}\n\n${prompt}`
-      : prompt;
+      ? `${options.systemPromptAppend}\n\n${resumedPrompt}`
+      : resumedPrompt;
     firstTurn = false;
     const {events} = await thread.runStreamed(input, {signal});
     for await (const event of events) {
       const timestamp = new Date().toISOString();
-      if (
+      if (event.type === "thread.started" && !identityReported) {
+        identityReported = true;
+        await options.handlers.onSessionIdentity?.({
+          provider: "codex",
+          conversationId: event.thread_id
+        });
+      } else if (
         event.type === "item.completed" &&
         event.item.type === "agent_message"
       ) {

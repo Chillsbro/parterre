@@ -3,7 +3,8 @@ import {resolve} from "node:path";
 import {
   clearCodebaseProfile,
   getCodebaseProfile,
-  isCodebaseProfileStale
+  isCodebaseProfileStale,
+  updateSessionModel
 } from "../../sessions/index.js";
 import {validateCodebaseRoot} from "../codebase/index.js";
 import type {AgentHandle} from "../providers/index.js";
@@ -119,10 +120,21 @@ export function createRuntimeController(
     },
     async setModel(modelId: string): Promise<void> {
       await agent.setModel(modelId);
+      await updateSessionModel(
+        context.config.storageDir,
+        context.sessionId,
+        modelId
+      );
       await context.publish({
         type: "model_changed",
         timestamp: new Date().toISOString(),
         model: modelId
+      });
+    },
+    async clearTranscript(): Promise<void> {
+      await context.publish({
+        type: "transcript_cleared",
+        timestamp: new Date().toISOString()
       });
     },
     authorizeCodebaseRoot(path: string): string {
