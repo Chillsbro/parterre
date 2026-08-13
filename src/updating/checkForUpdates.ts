@@ -3,7 +3,6 @@ import {createHash} from "node:crypto";
 import {mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {dirname, join, parse, resolve} from "node:path";
-import {createInterface} from "node:readline/promises";
 import {pathToFileURL} from "node:url";
 import packageMetadata from "../../package.json" with {type: "json"};
 
@@ -39,7 +38,6 @@ interface UpdateOptions {
   installed?: InstalledRelease | undefined;
   interactive?: boolean | undefined;
   fetchLatest?: (() => Promise<ReleaseUpdate>) | undefined;
-  confirm?: ((question: string) => Promise<boolean>) | undefined;
   install?:
     | ((installed: InstalledRelease, update: ReleaseUpdate) => Promise<void>)
     | undefined;
@@ -175,18 +173,6 @@ export async function fetchLatestRelease(
   };
 }
 
-async function confirmUpdate(question: string): Promise<boolean> {
-  const readline = createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  try {
-    return /^(?:y|yes)$/i.test((await readline.question(question)).trim());
-  } finally {
-    readline.close();
-  }
-}
-
 async function waitForExit(command: string, args: string[], env = process.env) {
   const child = spawn(command, args, {env, stdio: "inherit"});
   return await new Promise<number | null>((resolveExit, rejectExit) => {
@@ -261,15 +247,8 @@ export async function maybeUpdateParterre(
 
   const write = options.write ?? (message => process.stdout.write(message));
   write(
-    `\nParterre ${latestRelease.version} is available (installed ${installed.version}).\n`
+    `\nParterre ${latestRelease.version} is available (installed ${installed.version}). Updating…\n`
   );
-  let accepted: boolean;
-  try {
-    accepted = await (options.confirm ?? confirmUpdate)("Update now? [y/N] ");
-  } catch {
-    return false;
-  }
-  if (!accepted) return false;
 
   try {
     await (options.install ?? installRelease)(installed, latestRelease);
