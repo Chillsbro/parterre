@@ -63,6 +63,29 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
       }
       continue;
     }
+    if (event.type === "assertion_finished") {
+      const expected =
+        "expected" in event.result.assertion
+          ? JSON.stringify(event.result.assertion.expected)
+          : event.result.assertion.kind;
+      items.push({
+        id: event.result.id,
+        kind: event.result.outcome === "error" ? "error" : "tool",
+        content: `${event.result.outcome === "passed" ? "✓" : "✗"} ${event.result.label}`,
+        detail: `expected ${expected}, observed ${JSON.stringify(event.result.observed)}`,
+        ok: event.result.outcome === "passed"
+      });
+      for (const artifact of event.result.artifacts) {
+        items.push({
+          id: `${event.result.id}-${artifact}`,
+          kind: "tool",
+          content: "Assertion evidence — view ",
+          link: {label: "here", href: pathToFileURL(artifact).href},
+          ok: true
+        });
+      }
+      continue;
+    }
     if (event.type === "target_test_finished") {
       if (!event.result.ok) {
         items.push({

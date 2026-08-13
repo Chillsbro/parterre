@@ -94,6 +94,47 @@ test("adds a filesystem link after a video recording finishes", () => {
   ]);
 });
 
+test("renders replayable assertion evidence", () => {
+  const items = buildTimelineItems([
+    {
+      type: "assertion_finished",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      result: {
+        protocol: "parterre.assertion.v1",
+        id: "assertion-1",
+        label: "checkout completed",
+        assertion: {
+          kind: "title",
+          expected: "Done",
+          match: "exact"
+        },
+        outcome: "failed",
+        observed: "Waiting",
+        durationMs: 1000,
+        artifacts: ["/tmp/assertion.png"],
+        testHint: {locator: "page", matcher: 'toHaveTitle("Done")'}
+      }
+    }
+  ]);
+
+  expect(items).toEqual([
+    {
+      id: "assertion-1",
+      kind: "tool",
+      content: "✗ checkout completed",
+      detail: 'expected "Done", observed "Waiting"',
+      ok: false
+    },
+    {
+      id: "assertion-1-/tmp/assertion.png",
+      kind: "tool",
+      content: "Assertion evidence — view ",
+      link: {label: "here", href: "file:///tmp/assertion.png"},
+      ok: true
+    }
+  ]);
+});
+
 test("links a materialized target test with its conventional exit code", () => {
   const items = buildTimelineItems([
     {

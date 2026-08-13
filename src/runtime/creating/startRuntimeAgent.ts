@@ -3,13 +3,17 @@ import {
   createPlaywrightExecutor
 } from "../../playwright/index.js";
 import {updateSessionStatus} from "../../sessions/index.js";
-import {createBrowserCommandRunner} from "../browser/index.js";
+import {
+  createBrowserAssertionRunner,
+  createBrowserCommandRunner
+} from "../browser/index.js";
 import {
   type AgentFactory,
   type AgentHandle,
   resolveAgentFactory
 } from "../providers/index.js";
 import {
+  createBrowserAssertionTool,
   createMaterializeTargetTestTool,
   createPlaywrightTool,
   createQueryCodebaseProfileTool,
@@ -26,15 +30,23 @@ export async function startRuntimeAgent(
   try {
     const createAgent =
       agentFactory ?? (await resolveAgentFactory(context.config.provider));
+    const executor = createPlaywrightExecutor({
+      command: context.config.playwrightCommand,
+      workspace: context.config.workspace,
+      playwrightSession: context.playwrightSession,
+      storageDir: context.config.storageDir,
+      sessionId: context.sessionId
+    });
     const runner = createBrowserCommandRunner({
       context,
-      executor: createPlaywrightExecutor({
-        command: context.config.playwrightCommand,
-        workspace: context.config.workspace,
-        playwrightSession: context.playwrightSession,
-        storageDir: context.config.storageDir,
-        sessionId: context.sessionId
-      })
+      executor
+    });
+    const passedAssertionIds = new Set<string>();
+    const assertionRunner = createBrowserAssertionRunner({
+      context,
+      browser: runner,
+      executor,
+      passedAssertionIds
     });
     return await createAgent({
       sessionId: context.sessionId,
@@ -44,7 +56,8 @@ export async function startRuntimeAgent(
       baseUrl: context.config.baseUrl,
       tools: [
         createPlaywrightTool(runner),
-        createMaterializeTargetTestTool(context),
+        createBrowserAssertionTool(assertionRunner),
+        createMaterializeTargetTestTool(context, passedAssertionIds),
         createReadCodebaseTool(context),
         createSaveCodebaseProfileTool(context),
         createQueryCodebaseProfileTool(context)

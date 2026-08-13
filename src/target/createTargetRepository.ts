@@ -49,6 +49,7 @@ const testSourceExtensions = new Set([
 export interface MaterializeTestRequest {
   path: string;
   content: string;
+  sourceAssertionIds?: string[];
 }
 
 export type MaterializeTestResult =
@@ -61,6 +62,7 @@ export type MaterializeTestResult =
       timedOut: boolean;
       stdout: string;
       stderr: string;
+      sourceAssertionIds?: string[];
     }
   | {ok: false; error: string; path?: string};
 
@@ -331,6 +333,7 @@ export function createTargetRepository(rootPath: string): TargetRepository {
           passed: result.exitCode === 0 && !result.timedOut,
           path,
           command,
+          sourceAssertionIds: request.sourceAssertionIds ?? [],
           ...result
         };
       } catch (error) {

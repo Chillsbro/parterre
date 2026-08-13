@@ -1,5 +1,4 @@
 export interface BrowserCommandDescriptor {
-  tier: "safe" | "sensitive";
   visualChange: boolean;
   affectsTabs: boolean;
   opensBrowser: boolean;
@@ -14,19 +13,7 @@ interface DescriptorFlags {
 }
 
 function safe(flags: DescriptorFlags = {}): BrowserCommandDescriptor {
-  return describe("safe", flags);
-}
-
-function sensitive(flags: DescriptorFlags = {}): BrowserCommandDescriptor {
-  return describe("sensitive", flags);
-}
-
-function describe(
-  tier: BrowserCommandDescriptor["tier"],
-  flags: DescriptorFlags
-): BrowserCommandDescriptor {
   return {
-    tier,
     visualChange: flags.visual !== false,
     affectsTabs: flags.tabs === true,
     opensBrowser: flags.opens === true,
@@ -50,6 +37,7 @@ const browserCommandDescriptors: Record<string, BrowserCommandDescriptor> = {
   snapshot: safe({visual: false}),
   find: safe(),
   eval: safe(),
+  "run-code": safe(),
   resize: safe(),
   "go-back": safe(),
   "go-forward": safe(),
@@ -63,7 +51,7 @@ const browserCommandDescriptors: Record<string, BrowserCommandDescriptor> = {
   mousewheel: safe(),
   screenshot: safe({visual: false}),
   pdf: safe({visual: false}),
-  "tab-list": safe(),
+  "tab-list": safe({visual: false}),
   "tab-new": safe({tabs: true}),
   "tab-close": safe({tabs: true}),
   "tab-select": safe({tabs: true}),
@@ -85,33 +73,36 @@ const browserCommandDescriptors: Record<string, BrowserCommandDescriptor> = {
   "dialog-dismiss": safe(),
   "generate-locator": safe({visual: false}),
   highlight: safe(),
-  upload: sensitive(),
-  drop: sensitive(),
-  "run-code": sensitive(),
-  "state-save": sensitive({visual: false}),
-  "state-load": sensitive(),
-  "cookie-set": sensitive(),
-  "cookie-delete": sensitive(),
-  "cookie-clear": sensitive(),
-  "localstorage-set": sensitive(),
-  "localstorage-delete": sensitive(),
-  "localstorage-clear": sensitive(),
-  "sessionstorage-set": sensitive(),
-  "sessionstorage-delete": sensitive(),
-  "sessionstorage-clear": sensitive(),
-  route: sensitive(),
-  unroute: sensitive(),
-  "network-state-set": sensitive(),
-  "tracing-start": sensitive({visual: false}),
-  "tracing-stop": sensitive({visual: false}),
-  "video-start": sensitive({visual: false}),
-  "video-stop": sensitive({visual: false}),
-  "video-chapter": sensitive({visual: false}),
-  "video-show-actions": sensitive({visual: false}),
-  "video-hide-actions": sensitive({visual: false}),
-  attach: sensitive(),
-  detach: sensitive({visual: false}),
-  "delete-data": sensitive({visual: false})
+  upload: safe(),
+  drop: safe(),
+  "state-save": safe({visual: false}),
+  "state-load": safe({visual: false}),
+  "cookie-set": safe({visual: false}),
+  "cookie-delete": safe({visual: false}),
+  "cookie-clear": safe({visual: false}),
+  "localstorage-set": safe({visual: false}),
+  "localstorage-delete": safe({visual: false}),
+  "localstorage-clear": safe({visual: false}),
+  "sessionstorage-set": safe({visual: false}),
+  "sessionstorage-delete": safe({visual: false}),
+  "sessionstorage-clear": safe({visual: false}),
+  route: safe({visual: false}),
+  unroute: safe({visual: false}),
+  "network-state-set": safe({visual: false}),
+  "tracing-start": safe({visual: false}),
+  "tracing-stop": safe({visual: false}),
+  "video-start": safe({visual: false}),
+  "video-stop": safe({visual: false}),
+  "video-chapter": safe({visual: false}),
+  "video-show-actions": safe({visual: false}),
+  "video-hide-actions": safe({visual: false}),
+  attach: safe({opens: true}),
+  detach: safe({visual: false, closes: true}),
+  "delete-data": safe({visual: false, closes: true}),
+  "pause-at": safe({tabs: true}),
+  resume: safe({tabs: true}),
+  "step-over": safe({tabs: true}),
+  "config-print": safe({visual: false})
 };
 
 export function getBrowserCommandDescriptor(

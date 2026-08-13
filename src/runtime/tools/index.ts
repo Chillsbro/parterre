@@ -1,3 +1,4 @@
+export * from "./createBrowserAssertionTool.js";
 export * from "./createMaterializeTargetTestTool.js";
 export * from "./createPlaywrightTool.js";
 export * from "./createQueryCodebaseProfileTool.js";
