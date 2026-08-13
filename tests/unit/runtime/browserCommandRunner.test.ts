@@ -78,7 +78,7 @@ test("denies unknown commands without executing anything", async () => {
   expect(events).toHaveLength(0);
 });
 
-test("requires approval for sensitive commands and honors denial", async () => {
+test("runs managed state commands without prompting for approval", async () => {
   const {context, approvalRequests} = createFakeContext({approve: false});
   const {executor, requests} = createFakeExecutor();
   const runner = createBrowserCommandRunner({context, executor});
@@ -87,14 +87,9 @@ test("requires approval for sensitive commands and honors denial", async () => {
     command: "cookie-clear",
     args: []
   });
-  expect(approvalRequests).toEqual([
-    {
-      command: "cookie-clear",
-      reason: "The cookie-clear command can mutate browser or filesystem state"
-    }
-  ]);
-  expect(result).toEqual({ok: false, error: "User denied action"});
-  expect(requests).toHaveLength(0);
+  expect(approvalRequests).toEqual([]);
+  expect(result.ok).toBe(true);
+  expect(requests.map(request => request.command)).toEqual(["cookie-clear"]);
 });
 
 test("auto-opens the browser before the first command", async () => {

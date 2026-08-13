@@ -5,7 +5,7 @@ import type {
 } from "../../src/runtime/index.js";
 
 export type ScriptedStep =
-  | {tool: string; input: unknown}
+  | {tool: string; input: unknown | ((toolResults: unknown[]) => unknown)}
   | {reply: string}
   | {error: string};
 
@@ -44,7 +44,11 @@ export function createScriptedAgent(
             definition => definition.name === step.tool
           );
           if (!tool) throw new Error(`Unknown scripted tool: ${step.tool}`);
-          toolResults.push(await tool.handler(step.input));
+          const input =
+            typeof step.input === "function"
+              ? step.input(toolResults)
+              : step.input;
+          toolResults.push(await tool.handler(input));
           continue;
         }
         if ("error" in step) {

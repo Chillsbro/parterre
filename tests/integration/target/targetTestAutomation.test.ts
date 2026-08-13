@@ -31,10 +31,44 @@ test("the runtime writes generated automation into its target repo", async () =>
     {
       steps: [
         {
-          tool: "materialize_target_test",
+          tool: "playwright_cli",
           input: {
-            path: "tests/checkout.test.ts",
-            content: 'test("checkout completes", () => {});\n'
+            command: "open",
+            args: [
+              "data:text/html,<h1>Checkout%20complete</h1><p>Order%20A-123</p>"
+            ]
+          }
+        },
+        {
+          tool: "browser_assert",
+          input: {
+            label: "checkout completed",
+            assertion: {
+              kind: "text",
+              target: {
+                by: "role",
+                role: "heading",
+                name: "Checkout complete",
+                exact: true
+              },
+              expected: "Checkout complete",
+              match: "exact"
+            },
+            timeoutMs: 1000
+          }
+        },
+        {
+          tool: "materialize_target_test",
+          input: (results: unknown[]) => {
+            const assertion = results[1] as {
+              id: string;
+              testHint: {locator: string; matcher: string};
+            };
+            return {
+              path: "tests/checkout.test.ts",
+              content: `test("checkout completes", async ({page}) => { await expect(${assertion.testHint.locator}).${assertion.testHint.matcher}; });\n`,
+              sourceAssertionIds: [assertion.id]
+            };
           }
         },
         {reply: "The checkout automation is written and passing."}
@@ -59,8 +93,11 @@ test("the runtime writes generated automation into its target repo", async () =>
     });
     expect(
       await readFile(join(root, "tests", "checkout.test.ts"), "utf8")
-    ).toContain("checkout completes");
-    expect(agent.toolResults[0]).toEqual(event.result);
+    ).toContain('toHaveText("Checkout complete")');
+    expect(agent.toolResults[2]).toEqual(event.result);
+    expect(event.result).toMatchObject({
+      sourceAssertionIds: [(agent.toolResults[1] as {id: string}).id]
+    });
     expect(harness.timeline()).toContainEqual(
       expect.objectContaining({
         kind: "tool",
@@ -73,4 +110,4 @@ test("the runtime writes generated automation into its target repo", async () =>
     await harness.dispose();
     await rm(root, {recursive: true, force: true});
   }
-});
+}, 60000);

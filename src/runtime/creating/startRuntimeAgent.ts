@@ -6,7 +6,10 @@ import {
   updateSessionAgentIdentity,
   updateSessionStatus
 } from "../../sessions/index.js";
-import {createBrowserCommandRunner} from "../browser/index.js";
+import {
+  createBrowserAssertionRunner,
+  createBrowserCommandRunner
+} from "../browser/index.js";
 import {ensureScreencast} from "../capturing/index.js";
 import {
   type AgentFactory,
@@ -15,6 +18,7 @@ import {
 } from "../providers/index.js";
 import type {SessionResumePlan} from "../resuming/index.js";
 import {
+  createBrowserAssertionTool,
   createMaterializeTargetTestTool,
   createPlaywrightTool,
   createQueryCodebaseProfileTool,
@@ -34,15 +38,23 @@ export async function startRuntimeAgent(
   try {
     const createAgent =
       agentFactory ?? (await resolveAgentFactory(context.config.provider));
+    const executor = createPlaywrightExecutor({
+      command: context.config.playwrightCommand,
+      workspace: context.config.workspace,
+      playwrightSession: context.playwrightSession,
+      storageDir: context.config.storageDir,
+      sessionId: context.sessionId
+    });
     const runner = createBrowserCommandRunner({
       context,
-      executor: createPlaywrightExecutor({
-        command: context.config.playwrightCommand,
-        workspace: context.config.workspace,
-        playwrightSession: context.playwrightSession,
-        storageDir: context.config.storageDir,
-        sessionId: context.sessionId
-      })
+      executor
+    });
+    const passedAssertionIds = new Set<string>();
+    const assertionRunner = createBrowserAssertionRunner({
+      context,
+      browser: runner,
+      executor,
+      passedAssertionIds
     });
     agent = await createAgent({
       sessionId: context.sessionId,
@@ -60,7 +72,8 @@ export async function startRuntimeAgent(
         : {}),
       tools: [
         createPlaywrightTool(runner),
-        createMaterializeTargetTestTool(context),
+        createBrowserAssertionTool(assertionRunner),
+        createMaterializeTargetTestTool(context, passedAssertionIds),
         createReadCodebaseTool(context),
         createWriteWorkspaceFileTool(context),
         createSaveCodebaseProfileTool(context),

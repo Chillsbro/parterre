@@ -1,3 +1,4 @@
+import type {BrowserAssertionResult} from "../../assertions/index.js";
 import type {PlaywrightRequest} from "../../playwright/index.js";
 import type {MaterializeTestResult} from "../../target/index.js";
 import type {WorkspaceFileWriteResult} from "../../workspace/index.js";
@@ -73,6 +74,11 @@ export type SessionEvent =
     }
   | {type: "playwright_started"; timestamp: string; request: PlaywrightRequest}
   | {type: "playwright_finished"; timestamp: string; result: PlaywrightResult}
+  | {
+      type: "assertion_finished";
+      timestamp: string;
+      result: BrowserAssertionResult;
+    }
   | {
       type: "target_test_finished";
       timestamp: string;

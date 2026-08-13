@@ -9,6 +9,15 @@ test("owns browser launch mode, config, and artifact paths", () => {
       "--headless",
       "--config=untrusted.json",
       "--filename=C:\\outside.png",
+      "--session",
+      "other-session",
+      "-s=other-session",
+      "--config",
+      "other.json",
+      "--filename",
+      "outside.png",
+      "--raw",
+      "--help",
       42
     ])
   ).toEqual(["https://example.com", "42"]);
