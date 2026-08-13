@@ -127,6 +127,37 @@ test("links a materialized target test with its conventional exit code", () => {
   ]);
 });
 
+test("links ordinary workspace files after they are written", () => {
+  const items = buildTimelineItems([
+    {
+      type: "workspace_file_finished",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      result: {
+        ok: true,
+        path: "/tmp/target/src/greeting.ts",
+        relativePath: "src/greeting.ts",
+        created: true,
+        changed: true,
+        bytes: 32
+      }
+    }
+  ]);
+
+  expect(items).toEqual([
+    {
+      id: "2026-01-01T00:00:00.000Z-workspace-file",
+      kind: "tool",
+      content: "Workspace file created — view ",
+      detail: "32 bytes",
+      link: {
+        label: "src/greeting.ts",
+        href: "file:///tmp/target/src/greeting.ts"
+      },
+      ok: true
+    }
+  ]);
+});
+
 test("formats timeline items as replay lines", () => {
   expect(formatTimelineItem({id: "1", kind: "user", content: "hi"})).toBe(
     "You: hi"

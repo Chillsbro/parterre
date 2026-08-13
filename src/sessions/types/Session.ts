@@ -1,5 +1,13 @@
 import type {PlaywrightRequest} from "../../playwright/index.js";
 import type {MaterializeTestResult} from "../../target/index.js";
+import type {WorkspaceFileWriteResult} from "../../workspace/index.js";
+
+export interface ApprovalRequest {
+  id: string;
+  command: string;
+  args: Array<string | number | boolean>;
+  reason?: string;
+}
 
 export type AgentMessage =
   | {type: "assistant_delta"; id: string; delta: string}
@@ -53,9 +61,14 @@ export type SessionEvent =
       result: MaterializeTestResult;
     }
   | {
+      type: "workspace_file_finished";
+      timestamp: string;
+      result: WorkspaceFileWriteResult;
+    }
+  | {
       type: "approval_requested";
       timestamp: string;
-      request: PlaywrightRequest;
+      request: ApprovalRequest;
       reason: string;
     }
   | {

@@ -87,6 +87,33 @@ export function buildTimelineItems(events: SessionEvent[]): TimelineItem[] {
       });
       continue;
     }
+    if (event.type === "workspace_file_finished") {
+      if (!event.result.ok) {
+        items.push({
+          id: `${event.timestamp}-workspace-file`,
+          kind: "error",
+          content: event.result.error
+        });
+        continue;
+      }
+      const state = event.result.changed
+        ? event.result.created
+          ? "created"
+          : "updated"
+        : "unchanged";
+      items.push({
+        id: `${event.timestamp}-workspace-file`,
+        kind: "tool",
+        content: `Workspace file ${state} — view `,
+        detail: `${event.result.bytes} bytes`,
+        link: {
+          label: event.result.relativePath,
+          href: pathToFileURL(event.result.path).href
+        },
+        ok: true
+      });
+      continue;
+    }
     if (event.type !== "agent_message") continue;
     if (event.message.type === "status") {
       items.push({

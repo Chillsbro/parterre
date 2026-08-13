@@ -22,6 +22,7 @@ One terminal, the whole session:
 - live Chromium, rendered beside the conversation;
 - a timed trace of every browser action;
 - manual browser workflows turned into tests in your target repo;
+- approval-gated README and source-file editing in your workspace;
 - approvals before sensitive changes;
 - session replay and local codebase profiles.
 
@@ -109,8 +110,12 @@ Type `/` and the command menu narrows as you type:
 | `/clear` | Clears the transcript |
 | `/quit` | Stops the session and exits |
 
-Sensitive browser actions pause for approval. Unknown commands are rejected;
-the agent only receives an allowlisted Playwright interface.
+Sensitive browser actions and every ordinary workspace-file write pause for
+approval. Workspace writes can create or replace regular files, but paths must
+stay inside `--workspace`; Parterre refuses `.git`, symbolic links, path
+escapes, concurrent changes, and files larger than 1 MiB. Unknown browser
+commands are rejected; the agent only receives an allowlisted Playwright
+interface.
 Press `Esc` while the agent is working to interrupt its current turn without
 ending the session.
 
@@ -166,6 +171,11 @@ Parterre
   |     +-- optional Claude Agent SDK adapter
   |     +-- built-in agent loop -> any OpenAI-compatible endpoint
   |
+  +-- workspace editor (the write_workspace_file tool)
+  |     |
+  |     +-- relative-path and symlink validation
+  |     +-- approval gate -> concurrent-change check -> atomic write
+  |
   +-- browser command runner (the playwright_cli tool)
   |     |
   |     +-- descriptor table: one row per command, allow -> approval -> deny
@@ -179,10 +189,11 @@ Parterre
         +-- transcript fold -> live TUI transcript and `parterre replay`
 ```
 
-The provider talks to a narrow set of Parterre tools. Browser commands cross
-the allowlist and approval gate, run in isolated Chromium, and enter the local
-session log. The live screencast is painted with your terminal's native image
-protocol. Detailed seams are documented in `CONTEXT.md`.
+The provider talks to a narrow set of Parterre tools. Workspace writes and
+sensitive browser commands cross the approval gate and enter the local session
+log. Browser commands also cross the allowlist and run in isolated Chromium.
+The live screencast is painted with your terminal's native image protocol.
+Detailed seams are documented in `CONTEXT.md`.
 
 ## Feedback and contributing
 
