@@ -204,39 +204,27 @@ test("does not make a release request outside an interactive installer-managed l
   expect(checked).toBe(false);
 });
 
-test("continues launching when current or when the user declines", async () => {
-  let prompted = false;
+test("continues launching when current", async () => {
+  let installedUpdate = false;
   expect(
     await maybeUpdateParterre({
       installed,
       interactive: true,
       fetchLatest: async () => update("v0.1.1"),
-      confirm: async () => {
-        prompted = true;
-        return true;
+      install: async () => {
+        installedUpdate = true;
       }
     })
   ).toBe(false);
-  expect(prompted).toBe(false);
-
-  expect(
-    await maybeUpdateParterre({
-      installed,
-      interactive: true,
-      fetchLatest: async () => update(),
-      confirm: async () => false,
-      write: () => {}
-    })
-  ).toBe(false);
+  expect(installedUpdate).toBe(false);
 });
 
-test("installs the selected release and restarts the original command", async () => {
+test("automatically installs a newer release and restarts the original command", async () => {
   const actions: string[] = [];
   const restarted = await maybeUpdateParterre({
     installed,
     interactive: true,
     fetchLatest: async () => update(),
-    confirm: async () => true,
     install: async (release, available) => {
       expect(release).toEqual(installed);
       actions.push(`install:${available.version}`);
@@ -270,19 +258,6 @@ test("an unavailable release check or failed update never blocks launch", async 
       installed,
       interactive: true,
       fetchLatest: async () => update(),
-      confirm: async () => {
-        throw new Error("input closed");
-      },
-      write: () => {}
-    })
-  ).toBe(false);
-
-  expect(
-    await maybeUpdateParterre({
-      installed,
-      interactive: true,
-      fetchLatest: async () => update(),
-      confirm: async () => true,
       install: async () => {
         throw new Error("archive unavailable");
       },
@@ -299,7 +274,6 @@ test("a completed update stops the old launch even when restart fails", async ()
       installed,
       interactive: true,
       fetchLatest: async () => update(),
-      confirm: async () => true,
       install: async () => {},
       restart: async () => {
         throw new Error("restart unavailable");
