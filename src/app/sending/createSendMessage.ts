@@ -1,4 +1,3 @@
-import type {Dispatch} from "react";
 import {expandSlashCommand} from "../../commands/index.js";
 import type {RuntimeController} from "../../runtime/index.js";
 import type {AppAction} from "../state/index.js";
@@ -6,7 +5,7 @@ import {findLocalCommandHandler} from "./localCommandHandlers.js";
 
 export interface SendMessageDeps {
   runtimeRef: {current: RuntimeController | undefined};
-  dispatch: Dispatch<AppAction>;
+  dispatch: (action: AppAction) => void;
   stopRuntime: () => Promise<void>;
   exit: (error?: Error) => void;
   openModelPicker: (activeModel: string) => void;

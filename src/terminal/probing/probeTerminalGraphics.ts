@@ -3,15 +3,12 @@ export interface TerminalGraphicsInfo {
   cellHeight: number;
   terminalWidth: number;
   terminalHeight: number;
-  supportsSixelGraphics: boolean;
   supportsKittyGraphics: boolean;
-  supportsITerm2Graphics: boolean;
 }
 
 const cellSizeRegex = /\x1b\[6;(\d+);(\d+);?t/;
 const textAreaSizeRegex = /\x1b\[4;(\d+);(\d+);?t/;
 const kittyRegex = /\x1b_Gi=31;(.+?)\x1b\\/;
-const itermRegex = /ReportCellSize=([\d.]+);([\d.]+);([\d.]+)/;
 const sentinelRegex = /\x1b\[\?(\d+(?:;\d+)*)c/;
 
 function decodeChunk(chunk: unknown): string {
@@ -34,9 +31,7 @@ export function probeTerminalGraphics(
     cellHeight: 20,
     terminalWidth: 10 * (process.stdout.columns ?? 80),
     terminalHeight: 20 * (process.stdout.rows ?? 24),
-    supportsSixelGraphics: false,
-    supportsKittyGraphics: false,
-    supportsITerm2Graphics: false
+    supportsKittyGraphics: false
   };
   if (
     !process.stdin.isTTY ||
@@ -57,8 +52,6 @@ export function probeTerminalGraphics(
       process.stdin.unref();
       const cellMatch = buffer.match(cellSizeRegex);
       const textAreaMatch = buffer.match(textAreaSizeRegex);
-      const itermMatch = buffer.match(itermRegex);
-      const sentinelMatch = buffer.match(sentinelRegex);
       const info: TerminalGraphicsInfo = {...fallback};
       if (cellMatch?.[1] && cellMatch?.[2]) {
         info.cellHeight = Number.parseInt(cellMatch[1], 10) || info.cellHeight;
@@ -72,19 +65,6 @@ export function probeTerminalGraphics(
           info.cellHeight = Math.floor(areaHeight / rows) || info.cellHeight;
           info.cellWidth = Math.floor(areaWidth / columns) || info.cellWidth;
         }
-      }
-      if (itermMatch?.[1] && itermMatch?.[2] && itermMatch?.[3]) {
-        const scale = Number.parseFloat(itermMatch[3]) || 1;
-        info.cellHeight =
-          Number.parseFloat(itermMatch[1]) * scale || info.cellHeight;
-        info.cellWidth =
-          Number.parseFloat(itermMatch[2]) * scale || info.cellWidth;
-        info.supportsITerm2Graphics = true;
-      }
-      if (sentinelMatch?.[1]) {
-        info.supportsSixelGraphics =
-          sentinelMatch[1].split(";").includes("4") ||
-          info.supportsSixelGraphics;
       }
       info.supportsKittyGraphics =
         kittyRegex.exec(buffer)?.[1]?.includes("OK") ?? false;
@@ -109,7 +89,6 @@ export function probeTerminalGraphics(
       "\x1b[16t" +
         "\x1b[14t" +
         "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\" +
-        "\x1b]1337;ReportCellSize\x07" +
         "\x1b[c"
     );
   });

@@ -31,6 +31,7 @@ interface ExistingSnapshot {
   mtimeMs: number;
   ctimeMs: number;
   sha256: string;
+  content: string;
 }
 
 type FileSnapshot = MissingSnapshot | ExistingSnapshot;
@@ -114,7 +115,8 @@ async function snapshot(path: string): Promise<FileSnapshot> {
     size: after.size,
     mtimeMs: after.mtimeMs,
     ctimeMs: after.ctimeMs,
-    sha256: createHash("sha256").update(content).digest("hex")
+    sha256: createHash("sha256").update(content).digest("hex"),
+    content: content.toString("utf8")
   };
 }
 
@@ -265,7 +267,9 @@ export function createWorkspaceEditor(options: {
         action: before.exists ? "replace" : "create",
         path,
         relativePath: target.relativePath,
-        bytes: content.byteLength
+        bytes: content.byteLength,
+        before: before.exists ? before.content : "",
+        after: request.content
       };
       if (!(await options.approve(proposal, signal))) {
         return failure("User denied workspace file write", path);

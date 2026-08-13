@@ -12,16 +12,26 @@ export function createWriteWorkspaceFileTool(
 ): AgentToolDefinition {
   const editor = createWorkspaceEditor({
     root: context.config.workspace,
-    approve: (proposal, signal) =>
-      context.approvals.request(
-        {
-          id: randomUUID(),
-          command: "write-workspace-file",
-          args: [proposal.relativePath]
-        },
-        `${proposal.action === "create" ? "Create" : "Replace"} workspace file ${proposal.relativePath} (${proposal.bytes} bytes)`,
-        signal
-      )
+    approve: async (proposal, signal) => {
+      const request = {
+        id: randomUUID(),
+        command: "write-workspace-file",
+        args: [proposal.relativePath]
+      };
+      context.onNotification({
+        type: "workspaceReview",
+        review: {...proposal, requestId: request.id}
+      });
+      try {
+        return await context.approvals.request(
+          request,
+          `${proposal.action === "create" ? "Create" : "Replace"} workspace file ${proposal.relativePath} (${proposal.bytes} bytes)`,
+          signal
+        );
+      } finally {
+        context.onNotification({type: "workspaceReview", review: undefined});
+      }
+    }
   });
   return {
     name: "write_workspace_file",

@@ -10,9 +10,7 @@ function graphics(
     cellHeight: 20,
     terminalWidth: 800,
     terminalHeight: 480,
-    supportsSixelGraphics: false,
     supportsKittyGraphics: false,
-    supportsITerm2Graphics: false,
     ...overrides
   };
 }
@@ -23,29 +21,15 @@ test("selects kitty when the terminal speaks kitty graphics", () => {
   ).toBe("kitty");
 });
 
-test("prefers iterm2 on iterm-family terminals that support it", () => {
+test("does not select a painter without Kitty graphics", () => {
   expect(
-    selectFramePainterProtocol(
-      graphics({supportsITerm2Graphics: true, supportsKittyGraphics: true}),
-      {TERM_PROGRAM: "iTerm.app"}
-    )
-  ).toBe("iterm2");
-});
-
-test("returns undefined for degraded terminals", () => {
-  expect(selectFramePainterProtocol(graphics(), {})).toBeUndefined();
-  expect(
-    selectFramePainterProtocol(graphics({supportsSixelGraphics: true}), {})
+    selectFramePainterProtocol(graphics(), {TERM_PROGRAM: "unsupported"})
   ).toBeUndefined();
+  expect(selectFramePainterProtocol(graphics(), {})).toBeUndefined();
 });
 
-test("honors the protocol override, including forcing the painter off", () => {
+test("allows an explicit Kitty override", () => {
   expect(
     selectFramePainterProtocol(graphics(), {PARTERRE_IMAGE_PROTOCOL: "kitty"})
   ).toBe("kitty");
-  expect(
-    selectFramePainterProtocol(graphics({supportsKittyGraphics: true}), {
-      PARTERRE_IMAGE_PROTOCOL: "halfBlock"
-    })
-  ).toBeUndefined();
 });

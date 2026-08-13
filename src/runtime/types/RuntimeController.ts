@@ -1,8 +1,14 @@
 import type {SessionEvent} from "../../sessions/index.js";
+import type {WorkspaceWriteProposal} from "../../workspace/index.js";
+
+export interface WorkspaceReview extends WorkspaceWriteProposal {
+  requestId: string;
+}
 
 export type RuntimeNotification =
   | {type: "event"; event: SessionEvent}
   | {type: "liveFrame"; path: string}
+  | {type: "workspaceReview"; review: WorkspaceReview | undefined}
   | {type: "status"; status: "starting" | "running" | "stopped" | "failed"};
 
 export interface ModelChoice {

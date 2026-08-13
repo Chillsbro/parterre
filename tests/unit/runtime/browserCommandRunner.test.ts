@@ -5,7 +5,10 @@ import type {
   PlaywrightRequest
 } from "../../../src/playwright/index.js";
 import type {RuntimeContext} from "../../../src/runtime/index.js";
-import {createBrowserCommandRunner} from "../../../src/runtime/index.js";
+import {
+  createBrowserCommandRunner,
+  ensureScreencast
+} from "../../../src/runtime/index.js";
 import type {SessionEvent} from "../../../src/sessions/index.js";
 
 function createFakeContext(options?: {
@@ -25,6 +28,7 @@ function createFakeContext(options?: {
       redactions: []
     },
     frameFormat: "jpeg",
+    liveFrames: true,
     sessionId: "session-1",
     playwrightSession: "pw-1",
     approvals: {
@@ -66,6 +70,15 @@ function createFakeExecutor(output = "") {
   };
   return {executor, requests, executionOptions};
 }
+
+test("does not start a screencast when live frames are disabled", async () => {
+  const {context, events} = createFakeContext();
+  context.liveFrames = false;
+  context.state.screencast = undefined;
+  await ensureScreencast(context);
+  expect(context.state.screencast).toBeUndefined();
+  expect(events).toHaveLength(0);
+});
 
 test("denies unknown commands without executing anything", async () => {
   const {context, events} = createFakeContext();

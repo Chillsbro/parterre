@@ -34,30 +34,10 @@ parterre setup     # installs the browser and asks which provider to use
 parterre run
 ```
 
-The installer puts Parterre in `~/.local/share/parterre` and links the command
-into `~/.local/bin`. It installs Bun first when needed. Set
-`PARTERRE_INSTALL_DIR` or `PARTERRE_BIN_DIR` to choose different locations.
-Installer-managed releases check GitHub when launched from an interactive
-terminal. When a newer stable release exists, Parterre updates automatically
-and then resumes the original command. Before installation, Parterre verifies
-the release archive against its GitHub-provided SHA-256 digest and passes the
-verified local file to the installer already on disk; it never executes an
-installer fetched from a mutable tag. The installer preflights free space,
-stages the release on the install filesystem, smoke-tests it before and after
-the swap, atomically exchanges the installation directories on Linux and
-macOS, and restores the previous installation if applying it fails. Offline
-checks and failed updates never block startup.
-Run `parterre -v` or `parterre --v` to print the installed release without an
-update check.
+Live browser frames currently require Ghostty or Kitty.
 
-Setup installs only the adapter you choose. If you are already signed in, it
-confirms that immediately:
-
-```text
-Found authenticated Codex.
-
-Run `parterre run` to start a session.
-```
+Setup installs only the adapter you choose and reuses its existing
+authentication.
 
 ## Use your provider
 
@@ -111,11 +91,12 @@ Type `/` and the command menu narrows as you type:
 | `/quit` | Stops the session and exits |
 
 Sensitive browser actions and every ordinary workspace-file write pause for
-approval. Workspace writes can create or replace regular files, but paths must
-stay inside `--workspace`; Parterre refuses `.git`, symbolic links, path
-escapes, concurrent changes, and files larger than 1 MiB. Unknown browser
-commands are rejected; the agent only receives an allowlisted Playwright
-interface.
+approval. Workspace writes open a full-screen diff before anything changes;
+press `y` to approve or `n` to deny. Writes can create or replace regular
+files, but paths must stay inside `--workspace`; Parterre refuses `.git`,
+symbolic links, path escapes, concurrent changes, and files larger than 1 MiB.
+Unknown browser commands are rejected; the agent only receives an allowlisted
+Playwright interface.
 Press `Esc` while the agent is working to interrupt its current turn without
 ending the session.
 
@@ -124,16 +105,6 @@ existing test convention (`bun test`, `npm test`, `cargo test`, `go test`,
 `pytest`, and similar entrypoints) to judge generated automation by exit code.
 It will not replace an existing file: during one session, it may only revise a
 test file that it created itself.
-
-## Render quality
-
-| Terminal | Protocol | Result |
-| --- | --- | --- |
-| Ghostty, Kitty | Kitty graphics | Pixel-perfect |
-| iTerm2, WezTerm, Warp | iTerm2 inline images | Pixel-perfect |
-| Sixel-capable (incl. VS Code with images enabled) | Sixel | Sharp |
-| Everything else | Unicode half-block mosaic | Impressionist |
-
 
 ## Sessions
 
@@ -166,49 +137,6 @@ The browser uses the session's persistent profile. A crashed session reuses a
 still-live compatible browser; a cleanly stopped session starts a new browser
 at its last safe HTTP(S) URL. Parterre shows a warning before either path
 because the profile may restore authenticated website state.
-
-## How it fits together
-
-```text
-Parterre
-  |
-  +-- setup and provider discovery
-  |     |
-  |     +-- install only the selected optional adapter
-  |     +-- ask installed adapters for authenticated: yes / no
-  |     +-- save provider, model, and endpoint preferences
-  |         (credentials and account details stay with the provider)
-  |
-  +-- agent provider seam (automatic discovery or explicit selection)
-  |     |
-  |     +-- optional Codex SDK adapter
-  |     +-- optional GitHub Copilot SDK adapter
-  |     +-- optional Claude Agent SDK adapter
-  |     +-- built-in agent loop -> any OpenAI-compatible endpoint
-  |
-  +-- workspace editor (the write_workspace_file tool)
-  |     |
-  |     +-- relative-path and symlink validation
-  |     +-- approval gate -> concurrent-change check -> atomic write
-  |
-  +-- browser command runner (the playwright_cli tool)
-  |     |
-  |     +-- descriptor table: one row per command, allow -> approval -> deny
-  |     +-- executor -> playwright-cli -> isolated headless Chromium
-  |     +-- frame capture after every visual action
-  |     +-- CDP screencast -> frame painter drawing protocol-native
-  |         frames into the viewport, outside the UI render loop
-  |
-  +-- session event log (SQLite, ordered)
-        |
-        +-- transcript fold -> live TUI transcript and `parterre replay`
-```
-
-The provider talks to a narrow set of Parterre tools. Workspace writes and
-sensitive browser commands cross the approval gate and enter the local session
-log. Browser commands also cross the allowlist and run in isolated Chromium.
-The live screencast is painted with your terminal's native image protocol.
-Detailed seams are documented in `CONTEXT.md`.
 
 ## Feedback and contributing
 

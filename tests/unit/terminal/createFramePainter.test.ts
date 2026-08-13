@@ -31,19 +31,15 @@ async function writeFrame(
   return path;
 }
 
-function createHarness(protocol: "kitty" | "iterm2") {
+function createHarness(positioning: "relative" | "absolute" = "relative") {
   const writes: string[] = [];
-  let firstFrames = 0;
   const painter = createFramePainter({
-    protocol,
     cellWidth: 10,
     cellHeight: 20,
     stdout: {write: (data: string) => writes.push(data), rows: 40},
-    onFirstFrame: () => {
-      firstFrames += 1;
-    }
+    positioning
   });
-  return {painter, writes, firstFrames: () => firstFrames};
+  return {painter, writes};
 }
 
 const region: FrameRegion = {
@@ -68,9 +64,9 @@ test("reads png dimensions from the header", () => {
   );
 });
 
-test("kitty: transmits the frame and places a contain-fitted box", async () => {
+test("transmits a Kitty frame and places a contain-fitted box", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes, firstFrames} = createHarness("kitty");
+  const {painter, writes} = createHarness();
   painter.setRegion(region);
   painter.submitFrame(await writeFrame(dir, "f1.png", makePng(1280, 800)));
   await idle();
@@ -80,12 +76,11 @@ test("kitty: transmits the frame and places a contain-fitted box", async () => {
   expect(output).toContain("_Ga=p,i=4041,p=1,c=56,r=18,C=1,q=2");
   expect(output).toContain(`${esc}[37A`);
   expect(output).toContain(`${esc}[42C`);
-  expect(firstFrames()).toBe(1);
 });
 
-test("kitty: alternates image ids and deletes the previous frame", async () => {
+test("alternates Kitty image ids and deletes the prior frame", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes} = createHarness("kitty");
+  const {painter, writes} = createHarness();
   painter.setRegion(region);
   painter.submitFrame(await writeFrame(dir, "f1.png", makePng(1280, 800)));
   await idle();
@@ -98,7 +93,7 @@ test("kitty: alternates image ids and deletes the previous frame", async () => {
 
 test("coalesces to the latest frame while a paint is in flight", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes} = createHarness("kitty");
+  const {painter, writes} = createHarness();
   const first = await writeFrame(dir, "f1.png", makePng(1280, 800));
   const second = await writeFrame(dir, "f2.png", makePng(640, 400));
   const third = await writeFrame(dir, "f3.png", makePng(320, 200));
@@ -111,9 +106,9 @@ test("coalesces to the latest frame while a paint is in flight", async () => {
   expect(writes.at(-1)).toContain("i=4042");
 });
 
-test("holds the frame until a region is known", async () => {
+test("holds the newest frame until a region is known", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes} = createHarness("kitty");
+  const {painter, writes} = createHarness();
   painter.submitFrame(await writeFrame(dir, "f1.png", makePng(1280, 800)));
   await idle();
   expect(writes).toHaveLength(0);
@@ -122,9 +117,9 @@ test("holds the frame until a region is known", async () => {
   expect(writes).toHaveLength(1);
 });
 
-test("kitty: repaint re-places without retransmitting", async () => {
+test("repaint re-places without retransmitting", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes} = createHarness("kitty");
+  const {painter, writes} = createHarness();
   painter.setRegion(region);
   painter.submitFrame(await writeFrame(dir, "f1.png", makePng(1280, 800)));
   await idle();
@@ -134,9 +129,9 @@ test("kitty: repaint re-places without retransmitting", async () => {
   expect(writes[1]).not.toContain("_Gf=100");
 });
 
-test("kitty: stop deletes the active image", async () => {
+test("stop deletes the active Kitty image", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes} = createHarness("kitty");
+  const {painter, writes} = createHarness();
   painter.setRegion(region);
   painter.submitFrame(await writeFrame(dir, "f1.png", makePng(1280, 800)));
   await idle();
@@ -147,28 +142,38 @@ test("kitty: stop deletes the active image", async () => {
   expect(writes).toHaveLength(2);
 });
 
-test("iterm2: writes the inline file payload sized to the region", async () => {
+test("absolute positioning is independent of the TUI cursor", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes} = createHarness("iterm2");
-  const bytes = makePng(1280, 800);
+  const {painter, writes} = createHarness("absolute");
   painter.setRegion(region);
-  painter.submitFrame(await writeFrame(dir, "f1.jpeg", bytes));
+  painter.submitFrame(await writeFrame(dir, "f1.png", makePng(1280, 800)));
   await idle();
-  expect(writes).toHaveLength(1);
-  const output = writes[0]!;
-  expect(output).toContain(
-    `]1337;File=inline=1;size=${bytes.byteLength};width=56;height=20;preserveAspectRatio=1:`
-  );
-  expect(output).toContain(Buffer.from(bytes).toString("base64"));
+  expect(writes[0]).toContain(`${esc}[3;43H`);
+  expect(writes[0]).not.toContain(`${esc}[37A`);
 });
 
-test("iterm2: repaint rewrites the last payload", async () => {
+test("suspend and resume paint only the newest queued frame", async () => {
   const dir = await mkdtemp(join(tmpdir(), "painter-"));
-  const {painter, writes} = createHarness("iterm2");
+  const {painter, writes} = createHarness("absolute");
+  const first = await writeFrame(dir, "f1.png", makePng(1280, 800));
+  const second = await writeFrame(dir, "f2.png", makePng(640, 400));
+  const newestBytes = makePng(320, 200);
+  const newest = await writeFrame(dir, "f3.png", newestBytes);
   painter.setRegion(region);
-  painter.submitFrame(await writeFrame(dir, "f1.jpeg", makePng(1280, 800)));
+  painter.submitFrame(first);
   await idle();
-  painter.repaint();
-  expect(writes).toHaveLength(2);
-  expect(writes[1]).toBe(writes[0]);
+
+  painter.suspend();
+  expect(writes[1]).toBe(`${esc}_Ga=d,d=i,i=4041,p=1,q=2${esc}\\`);
+  expect(writes[2]).toContain(`${esc}[2;43H${" ".repeat(region.width)}`);
+  painter.submitFrame(second);
+  painter.submitFrame(newest);
+  await idle();
+  expect(writes).toHaveLength(3);
+
+  painter.resume();
+  await idle();
+  expect(writes).toHaveLength(4);
+  expect(writes[3]).toContain(Buffer.from(newestBytes).toString("base64"));
+  expect(writes[3]).toContain("i=4042");
 });

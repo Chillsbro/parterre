@@ -5,7 +5,8 @@ import type {AppConfig} from "../../src/config/index.js";
 import {
   type AgentFactory,
   createSessionRuntime,
-  type RuntimeController
+  type RuntimeController,
+  type WorkspaceReview
 } from "../../src/runtime/index.js";
 import type {SessionEvent} from "../../src/sessions/index.js";
 import {
@@ -19,6 +20,7 @@ export interface RuntimeHarness {
   events: SessionEvent[];
   frames: string[];
   statuses: string[];
+  workspaceReviews: Array<WorkspaceReview | undefined>;
   timeline(): TimelineItem[];
   waitForEvent<Type extends SessionEvent["type"]>(
     type: Type,
@@ -50,6 +52,7 @@ export async function startRuntimeHarness(options: {
   const events: SessionEvent[] = [];
   const frames: string[] = [];
   const statuses: string[] = [];
+  const workspaceReviews: Array<WorkspaceReview | undefined> = [];
   const listeners = new Set<() => void>();
 
   const controller = await createSessionRuntime({
@@ -62,6 +65,9 @@ export async function startRuntimeHarness(options: {
       if (notification.type === "event") events.push(notification.event);
       if (notification.type === "liveFrame") frames.push(notification.path);
       if (notification.type === "status") statuses.push(notification.status);
+      if (notification.type === "workspaceReview") {
+        workspaceReviews.push(notification.review);
+      }
       for (const listener of listeners) listener();
     }
   });
@@ -73,6 +79,7 @@ export async function startRuntimeHarness(options: {
     events,
     frames,
     statuses,
+    workspaceReviews,
     timeline: () => buildTimelineItems(events),
     waitForEvent(type, predicate, timeoutMs = 30000) {
       type Matched = Extract<SessionEvent, {type: typeof type}>;
