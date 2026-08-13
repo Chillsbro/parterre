@@ -14,6 +14,8 @@ Terms that name parterre's seams. Use these words in code, commits, and reviews.
 
 **Target repository** — the workspace selected by `--workspace`: the codebase whose browser workflow is under test and where generated automation belongs. `src/target/` owns test-shaped path validation, new-file materialization, conventional test-command discovery, execution, and exit-code verdict behind `materializeTest()`. It never replaces a pre-existing file and may revise only files it created during the current session.
 
+**Workspace editor** — the approval-gated module in `src/workspace/` that creates or atomically replaces ordinary files inside the selected workspace. Its `writeFile()` interface owns path containment, `.git` and symlink refusal, size limits, concurrent-change detection, and temporary-file cleanup. The runtime exposes it to every provider through `write_workspace_file`; successful writes become session events and filesystem links.
+
 **Executor** — the adapter that turns a Playwright request into a raw result at the browser-command module's internal seam: the real `playwright-cli` subprocess in production, an in-memory fake in tests.
 
 **Approval gate** — the module that owns a sensitive command's approval from request to resolution (`src/runtime/approvals/`): it publishes the approval events and settles the promise it created. The TUI answers approvals through the runtime controller; shutdown abandons them as denials.

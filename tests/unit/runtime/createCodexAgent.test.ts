@@ -1,6 +1,9 @@
 import {expect, test} from "bun:test";
 import type {ThreadEvent} from "@openai/codex-sdk";
-import type {AgentFactoryOptions} from "../../../src/runtime/index.js";
+import type {
+  AgentFactoryOptions,
+  AgentToolDefinition
+} from "../../../src/runtime/index.js";
 import {createCodexAgent} from "../../../src/runtime/providers/createCodexAgent.js";
 
 function events(items: ThreadEvent[]): AsyncIterable<ThreadEvent> {
@@ -33,6 +36,7 @@ function createHarness(authenticated = true, blockFirstTurn = false) {
   const threadOptions: unknown[] = [];
   const resumedIds: string[] = [];
   const identities: unknown[] = [];
+  const toolNames: string[] = [];
   let toolServerClosed = false;
   const turnSignals: AbortSignal[] = [];
   const options: AgentFactoryOptions = {
@@ -40,7 +44,14 @@ function createHarness(authenticated = true, blockFirstTurn = false) {
     model: "auto",
     workspace: "/workspace",
     systemPromptAppend: "Use Parterre tools.",
-    tools: [],
+    tools: [
+      {
+        name: "write_workspace_file",
+        description: "Write a workspace file",
+        schema: {},
+        handler: async () => ({ok: true})
+      }
+    ],
     handlers: {
       onAssistantDelta() {},
       onAssistantMessage: (_id, content) => messages.push(content),
@@ -100,12 +111,15 @@ function createHarness(authenticated = true, blockFirstTurn = false) {
         }
       };
     },
-    startToolServer: async () => ({
-      url: "http://127.0.0.1:1234/mcp",
-      async close() {
-        toolServerClosed = true;
-      }
-    })
+    startToolServer: async (tools: AgentToolDefinition[]) => {
+      toolNames.push(...tools.map(tool => tool.name));
+      return {
+        url: "http://127.0.0.1:1234/mcp",
+        async close() {
+          toolServerClosed = true;
+        }
+      };
+    }
   };
   return {
     options,
@@ -116,6 +130,7 @@ function createHarness(authenticated = true, blockFirstTurn = false) {
     threadOptions,
     resumedIds,
     identities,
+    toolNames,
     turnSignals,
     toolServerClosed: () => toolServerClosed
   };
@@ -230,5 +245,6 @@ test("runs Codex with Parterre tools and existing authentication", async () => {
     "summarize it"
   ]);
   expect(harness.messages).toEqual(["done", "done"]);
+  expect(harness.toolNames).toEqual(["write_workspace_file"]);
   expect(harness.toolServerClosed()).toBe(true);
 });
