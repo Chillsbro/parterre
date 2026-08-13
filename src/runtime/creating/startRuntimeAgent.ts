@@ -18,7 +18,8 @@ import {
   createPlaywrightTool,
   createQueryCodebaseProfileTool,
   createReadCodebaseTool,
-  createSaveCodebaseProfileTool
+  createSaveCodebaseProfileTool,
+  createWriteWorkspaceFileTool
 } from "../tools/index.js";
 import type {RuntimeContext} from "../types/index.js";
 import {systemPromptAppend} from "./systemPromptAppend.js";
@@ -59,6 +60,7 @@ export async function startRuntimeAgent(
         createBrowserAssertionTool(assertionRunner),
         createMaterializeTargetTestTool(context, passedAssertionIds),
         createReadCodebaseTool(context),
+        createWriteWorkspaceFileTool(context),
         createSaveCodebaseProfileTool(context),
         createQueryCodebaseProfileTool(context)
       ],

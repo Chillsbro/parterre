@@ -1,5 +1,5 @@
 import type {PlaywrightRequest} from "../../playwright/index.js";
-import type {SessionEvent} from "../../sessions/index.js";
+import type {ApprovalRequest, SessionEvent} from "../../sessions/index.js";
 
 export interface AppState {
   events: SessionEvent[];
@@ -15,7 +15,7 @@ export interface AppState {
   lastProcessError: string | undefined;
   pendingApproval:
     | {
-        request: PlaywrightRequest;
+        request: ApprovalRequest;
         reason: string;
       }
     | undefined;
