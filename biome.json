@@ -42,22 +42,12 @@
     {
       "includes": [
         "src/terminal/probing/probeTerminalGraphics.ts",
-        "scripts/generateReadmeAssets.tsx"
+        "scripts/generateReadmeAssets.ts"
       ],
       "linter": {
         "rules": {
           "suspicious": {
             "noControlCharactersInRegex": "off"
-          }
-        }
-      }
-    },
-    {
-      "includes": ["src/components/Brand/**"],
-      "linter": {
-        "rules": {
-          "suspicious": {
-            "noArrayIndexKey": "off"
           }
         }
       }

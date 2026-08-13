@@ -9,10 +9,12 @@ import type {SessionEvent} from "../../src/sessions/index.js";
 export interface ScriptedRuntime {
   createRuntime: typeof createSessionRuntime;
   emit(event: SessionEvent): void;
+  emitNotification(notification: RuntimeNotification): void;
   sentMessages: Array<{content: string; displayContent: string}>;
   approvals: Array<{requestId: string; approved: boolean}>;
   modelChanges: string[];
   interruptionCount(): number;
+  liveFramesEnabled(): boolean | undefined;
   stopped(): boolean;
 }
 
@@ -25,6 +27,7 @@ export function createScriptedRuntime(options?: {
   let notify: ((notification: RuntimeNotification) => void) | undefined;
   let stopped = false;
   let interruptions = 0;
+  let liveFrames: boolean | undefined;
   let activeTurnId: string | undefined;
 
   const emit = (event: SessionEvent): void => {
@@ -40,6 +43,7 @@ export function createScriptedRuntime(options?: {
   };
 
   const createRuntime: typeof createSessionRuntime = async runtimeOptions => {
+    liveFrames = runtimeOptions.liveFrames;
     notify = runtimeOptions.onNotification;
     notify({type: "status", status: "running"});
     return {
@@ -118,10 +122,12 @@ export function createScriptedRuntime(options?: {
   return {
     createRuntime,
     emit,
+    emitNotification: notification => notify?.(notification),
     sentMessages,
     approvals,
     modelChanges,
     interruptionCount: () => interruptions,
+    liveFramesEnabled: () => liveFrames,
     stopped: () => stopped
   };
 }

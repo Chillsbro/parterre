@@ -49,7 +49,7 @@ test("boots the real binary in a pty and exits cleanly on /quit", async () => {
   const subprocess = Bun.spawn({
     cmd: [
       process.execPath,
-      "src/cli.tsx",
+      "src/cli.ts",
       "run",
       "--provider",
       "openai",

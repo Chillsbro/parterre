@@ -26,6 +26,7 @@ export async function createSessionRuntime(options: {
   onNotification: (notification: RuntimeNotification) => void;
   agentFactory?: AgentFactory;
   frameFormat?: FrameFormat;
+  liveFrames?: boolean;
   resumeSessionId?: string | undefined;
 }): Promise<RuntimeController> {
   const resume = options.resumeSessionId

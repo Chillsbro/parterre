@@ -15,7 +15,7 @@ for (const flag of ["-v", "--v"]) {
     await writeFile(join(root, ".parterre-bin-dir"), `${binDir}\n`);
     await writeFile(
       wrapper,
-      `import ${JSON.stringify(resolve("src/cli.tsx"))};\n`
+      `import ${JSON.stringify(resolve("src/cli.ts"))};\n`
     );
     await writeFile(
       preload,

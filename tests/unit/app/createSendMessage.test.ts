@@ -1,5 +1,4 @@
 import {expect, test} from "bun:test";
-import type {Dispatch} from "react";
 import {createSendMessage} from "../../../src/app/sending/index.js";
 import type {AppAction} from "../../../src/app/state/index.js";
 import type {RuntimeController} from "../../../src/runtime/index.js";
@@ -24,7 +23,9 @@ function createDeps() {
     sent,
     deps: {
       runtimeRef: {current: runtime as RuntimeController | undefined},
-      dispatch: (action => actions.push(action)) as Dispatch<AppAction>,
+      dispatch: (action: AppAction) => {
+        actions.push(action);
+      },
       stopRuntime: async () => {},
       exit: () => {},
       openModelPicker: () => {},

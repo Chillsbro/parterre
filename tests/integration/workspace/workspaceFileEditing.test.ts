@@ -6,7 +6,11 @@ import type {
   AgentFactory,
   AgentToolDefinition
 } from "../../../src/runtime/index.js";
-import {closeSessionDatabase} from "../../../src/sessions/index.js";
+import {
+  closeSessionDatabase,
+  listSessions,
+  readSessionEvents
+} from "../../../src/sessions/index.js";
 import {startRuntimeHarness} from "../../support/runtimeHarness.js";
 import {createScriptedAgent} from "../../support/scriptedAgent.js";
 
@@ -81,6 +85,28 @@ test("the runtime writes README and source files after explicit approval", async
         path: join(root, "src", "greeting.ts")
       })
     ]);
+    expect(harness.workspaceReviews).toEqual([
+      expect.objectContaining({
+        relativePath: "README.md",
+        before: "# Old\n",
+        after: "# New README\n"
+      }),
+      undefined,
+      expect.objectContaining({
+        relativePath: "src/greeting.ts",
+        before: "",
+        after: 'export const greeting = "hello";\n'
+      }),
+      undefined
+    ]);
+    const [session] = await listSessions(harness.config.storageDir);
+    if (!session) throw new Error("Expected a persisted session");
+    const persistedEvents = JSON.stringify(
+      await readSessionEvents(harness.config.storageDir, session.id)
+    );
+    expect(persistedEvents).not.toContain("# Old");
+    expect(persistedEvents).not.toContain("# New README");
+    expect(persistedEvents).not.toContain('export const greeting = "hello"');
     expect(harness.timeline()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

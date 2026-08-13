@@ -14,6 +14,7 @@ export interface RuntimeState {
 export interface RuntimeContext {
   config: AppConfig;
   frameFormat: FrameFormat;
+  liveFrames: boolean;
   sessionId: string;
   playwrightSession: string;
   approvals: ApprovalGate;

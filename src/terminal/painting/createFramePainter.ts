@@ -1,8 +1,6 @@
 import {readFile} from "node:fs/promises";
 import {readPngDimensions} from "./readPngDimensions.js";
 
-export type FramePainterProtocol = "kitty" | "iterm2";
-
 export interface FrameRegion {
   col: number;
   row: number;
@@ -14,6 +12,8 @@ export interface FrameRegion {
 export interface FramePainter {
   submitFrame(path: string): void;
   setRegion(region: FrameRegion | undefined): void;
+  suspend(): void;
+  resume(): void;
   repaint(): void;
   stop(): void;
 }
@@ -23,11 +23,6 @@ interface PainterStdout {
   rows?: number | undefined;
 }
 
-const esc = String.fromCharCode(27);
-const bel = String.fromCharCode(7);
-const kittyChunkSize = 4096;
-const kittyImageIds = [4041, 4042];
-
 interface PlacementBox {
   col: number;
   row: number;
@@ -35,12 +30,20 @@ interface PlacementBox {
   rows: number;
 }
 
+const esc = String.fromCharCode(27);
+const kittyChunkSize = 4096;
+const kittyImageIds = [4041, 4042];
+
 function moveTo(
   box: {col: number; row: number},
   appHeight: number,
   terminalRows: number | undefined,
-  payload: string
+  payload: string,
+  positioning: "relative" | "absolute"
 ): string {
+  if (positioning === "absolute") {
+    return `${esc}7${esc}[${box.row + 1};${box.col + 1}H${payload}${esc}8`;
+  }
   const up =
     appHeight -
     box.row -
@@ -50,6 +53,15 @@ function moveTo(
   sequence += "\r";
   if (box.col > 0) sequence += `${esc}[${box.col}C`;
   return `${sequence}${payload}${esc}8`;
+}
+
+function clearRegion(region: FrameRegion): string {
+  const rows = Array.from(
+    {length: region.height},
+    (_, offset) =>
+      `${esc}[${region.row + offset + 1};${region.col + 1}H${" ".repeat(region.width)}`
+  ).join("");
+  return `${esc}7${rows}${esc}8`;
 }
 
 function kittyTransmit(imageId: number, base64Data: string): string {
@@ -78,31 +90,29 @@ function kittyDeletion(imageId: number): string {
   return `${esc}_Ga=d,d=I,i=${imageId},q=2${esc}\\`;
 }
 
-function iterm2Payload(
-  base64Data: string,
-  byteLength: number,
-  region: FrameRegion
-): string {
-  return `${esc}]1337;File=inline=1;size=${byteLength};width=${region.width};height=${region.height};preserveAspectRatio=1:${base64Data}${bel}`;
+function kittyPlacementDeletion(imageId: number): string {
+  return `${esc}_Ga=d,d=i,i=${imageId},p=1,q=2${esc}\\`;
 }
 
 export function createFramePainter(options: {
-  protocol: FramePainterProtocol;
   cellWidth: number;
   cellHeight: number;
   stdout: PainterStdout;
-  onFirstFrame?(): void;
+  positioning?: "relative" | "absolute";
 }): FramePainter {
-  const {protocol, cellWidth, cellHeight, stdout} = options;
+  const {cellWidth, cellHeight, stdout} = options;
+  const positioning = options.positioning ?? "relative";
   let region: FrameRegion | undefined;
   let pendingPath: string | undefined;
+  let latestPath: string | undefined;
+  let paintedPath: string | undefined;
   let painting = false;
   let stopped = false;
-  let live = false;
+  let suspended = false;
+  let generation = 0;
   let frameCount = 0;
-  let activeKittyId: number | undefined;
-  let activeKittyBox: {cols: number; rows: number} | undefined;
-  let activeIterm2: {base64Data: string; byteLength: number} | undefined;
+  let activeImageId: number | undefined;
+  let activeBox: {cols: number; rows: number} | undefined;
 
   const containBox = (
     image: {width: number; height: number},
@@ -128,53 +138,65 @@ export function createFramePainter(options: {
     };
   };
 
+  const placeActive = (): void => {
+    if (!region || activeImageId === undefined || !activeBox) return;
+    const box: PlacementBox = {
+      ...activeBox,
+      col: region.col + Math.floor((region.width - activeBox.cols) / 2),
+      row: region.row + Math.floor((region.height - activeBox.rows) / 2)
+    };
+    stdout.write(
+      moveTo(
+        box,
+        region.appHeight,
+        stdout.rows,
+        kittyPlacement(activeImageId, box),
+        positioning
+      )
+    );
+  };
+
   const paintFrame = async (path: string): Promise<void> => {
     const target = region;
     if (!target) return;
+    const targetGeneration = generation;
     const bytes = new Uint8Array(await readFile(path));
-    const base64Data = Buffer.from(bytes).toString("base64");
-    if (protocol === "kitty") {
-      const box = containBox(readPngDimensions(bytes), target);
-      const previousId = activeKittyId;
-      const imageId = kittyImageIds[frameCount % kittyImageIds.length] ?? 4041;
-      frameCount += 1;
-      stdout.write(
-        kittyTransmit(imageId, base64Data) +
-          moveTo(
-            box,
-            target.appHeight,
-            stdout.rows,
-            kittyPlacement(imageId, box)
-          ) +
-          (previousId !== undefined && previousId !== imageId
-            ? kittyDeletion(previousId)
-            : "")
-      );
-      activeKittyId = imageId;
-      activeKittyBox = {cols: box.cols, rows: box.rows};
-    } else {
-      activeIterm2 = {base64Data, byteLength: bytes.byteLength};
-      stdout.write(
+    if (
+      stopped ||
+      suspended ||
+      region !== target ||
+      generation !== targetGeneration
+    ) {
+      return;
+    }
+    const box = containBox(readPngDimensions(bytes), target);
+    const previousId = activeImageId;
+    const imageId = kittyImageIds[frameCount % kittyImageIds.length] ?? 4041;
+    frameCount += 1;
+    stdout.write(
+      kittyTransmit(imageId, Buffer.from(bytes).toString("base64")) +
         moveTo(
-          target,
+          box,
           target.appHeight,
           stdout.rows,
-          iterm2Payload(base64Data, bytes.byteLength, target)
-        )
-      );
-    }
-    if (!live) {
-      live = true;
-      options.onFirstFrame?.();
-    }
+          kittyPlacement(imageId, box),
+          positioning
+        ) +
+        (previousId !== undefined && previousId !== imageId
+          ? kittyDeletion(previousId)
+          : "")
+    );
+    activeImageId = imageId;
+    activeBox = {cols: box.cols, rows: box.rows};
+    paintedPath = path;
   };
 
   const drain = (): void => {
-    if (painting || stopped || !region || !pendingPath) return;
+    if (painting || stopped || suspended || !region || !pendingPath) return;
     painting = true;
     void (async () => {
       try {
-        while (!stopped && region && pendingPath) {
+        while (!stopped && !suspended && region && pendingPath) {
           const path = pendingPath;
           pendingPath = undefined;
           await paintFrame(path).catch(() => {});
@@ -186,55 +208,73 @@ export function createFramePainter(options: {
   };
 
   return {
-    submitFrame(path: string): void {
+    submitFrame(path): void {
       if (stopped) return;
+      latestPath = path;
       pendingPath = path;
       drain();
     },
-    setRegion(next: FrameRegion | undefined): void {
-      region = next && next.width > 0 && next.height > 0 ? next : undefined;
+    setRegion(next): void {
+      const valid =
+        next && next.width > 0 && next.height > 0 ? next : undefined;
+      if (
+        region?.col === valid?.col &&
+        region?.row === valid?.row &&
+        region?.width === valid?.width &&
+        region?.height === valid?.height &&
+        region?.appHeight === valid?.appHeight
+      ) {
+        return;
+      }
+      const previous = region;
+      region = valid;
+      generation += 1;
+      if (!region) {
+        pendingPath = undefined;
+        if (activeImageId !== undefined) {
+          stdout.write(kittyDeletion(activeImageId));
+          activeImageId = undefined;
+          activeBox = undefined;
+        }
+        if (positioning === "absolute" && previous) {
+          stdout.write(clearRegion(previous));
+        }
+        return;
+      }
+      if (!previous && latestPath) pendingPath = latestPath;
       drain();
     },
-    repaint(): void {
-      if (stopped || !region || !live) return;
-      if (protocol === "kitty") {
-        if (activeKittyId === undefined || !activeKittyBox) return;
-        const box: PlacementBox = {
-          ...activeKittyBox,
-          col:
-            region.col + Math.floor((region.width - activeKittyBox.cols) / 2),
-          row:
-            region.row + Math.floor((region.height - activeKittyBox.rows) / 2)
-        };
-        stdout.write(
-          moveTo(
-            box,
-            region.appHeight,
-            stdout.rows,
-            kittyPlacement(activeKittyId, box)
-          )
-        );
-      } else if (activeIterm2) {
-        stdout.write(
-          moveTo(
-            region,
-            region.appHeight,
-            stdout.rows,
-            iterm2Payload(
-              activeIterm2.base64Data,
-              activeIterm2.byteLength,
-              region
-            )
-          )
-        );
+    suspend(): void {
+      if (stopped || suspended) return;
+      suspended = true;
+      generation += 1;
+      pendingPath = undefined;
+      if (activeImageId !== undefined) {
+        stdout.write(kittyPlacementDeletion(activeImageId));
       }
+      if (positioning === "absolute" && region) {
+        stdout.write(clearRegion(region));
+      }
+    },
+    resume(): void {
+      if (stopped || !suspended) return;
+      suspended = false;
+      generation += 1;
+      if (latestPath && latestPath !== paintedPath) pendingPath = latestPath;
+      if (pendingPath) drain();
+      else placeActive();
+    },
+    repaint(): void {
+      if (stopped || suspended || activeImageId === undefined) return;
+      placeActive();
     },
     stop(): void {
       if (stopped) return;
       stopped = true;
+      generation += 1;
       pendingPath = undefined;
-      if (protocol === "kitty" && activeKittyId !== undefined) {
-        stdout.write(kittyDeletion(activeKittyId));
+      if (activeImageId !== undefined) {
+        stdout.write(kittyDeletion(activeImageId));
       }
     }
   };

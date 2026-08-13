@@ -1,4 +1,5 @@
 import type {PlaywrightRequest} from "../../playwright/index.js";
+import type {WorkspaceReview} from "../../runtime/index.js";
 import type {ApprovalRequest, SessionEvent} from "../../sessions/index.js";
 
 export interface AppState {
@@ -19,11 +20,13 @@ export interface AppState {
         reason: string;
       }
     | undefined;
+  workspaceReview: WorkspaceReview | undefined;
 }
 
 export type AppAction =
   | {type: "event"; event: SessionEvent}
   | {type: "liveFrame"; path: string}
+  | {type: "workspaceReview"; review: WorkspaceReview | undefined}
   | {type: "status"; status: AppState["status"]}
   | {type: "input"; input: string}
   | {type: "toggleBrowserFocus"}
@@ -42,5 +45,6 @@ export const initialAppState: AppState = {
   latestScreenshot: undefined,
   currentModel: undefined,
   lastProcessError: undefined,
-  pendingApproval: undefined
+  pendingApproval: undefined,
+  workspaceReview: undefined
 };

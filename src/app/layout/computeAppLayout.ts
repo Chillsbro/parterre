@@ -2,7 +2,7 @@ import {maxSlashCommandRows} from "../../commands/index.js";
 import {
   compactComposerHeight,
   computeComposerLayout
-} from "../../components/Composer/index.js";
+} from "./computeComposerLayout.js";
 
 const minimumTranscriptHeight = 4;
 

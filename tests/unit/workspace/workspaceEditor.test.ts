@@ -69,13 +69,17 @@ test("creates and replaces regular workspace files after approval", async () => 
         action: "create",
         path: join(root, "README.md"),
         relativePath: "README.md",
-        bytes: 8
+        bytes: 8,
+        before: "",
+        after: "# First\n"
       },
       {
         action: "replace",
         path: join(root, "README.md"),
         relativePath: "README.md",
-        bytes: 10
+        bytes: 10,
+        before: "# First\n",
+        after: "# Updated\n"
       }
     ]);
     expect(await readFile(join(root, "README.md"), "utf8")).toBe("# Updated\n");

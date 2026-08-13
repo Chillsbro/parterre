@@ -2,7 +2,9 @@ import type {RuntimeContext} from "../types/index.js";
 import {startScreencast} from "./startScreencast.js";
 
 export async function ensureScreencast(context: RuntimeContext): Promise<void> {
-  if (context.state.screencast || context.isStopped()) return;
+  if (!context.liveFrames || context.state.screencast || context.isStopped()) {
+    return;
+  }
   try {
     context.state.screencast = await startScreencast({
       storageDir: context.config.storageDir,

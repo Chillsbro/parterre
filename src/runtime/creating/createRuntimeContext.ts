@@ -13,6 +13,7 @@ export function createRuntimeContext(options: {
   config: AppConfig;
   onNotification: (notification: RuntimeNotification) => void;
   frameFormat?: FrameFormat;
+  liveFrames?: boolean;
   sessionId?: string | undefined;
   playwrightSession?: string | undefined;
   browserOpened?: boolean | undefined;
@@ -42,6 +43,7 @@ export function createRuntimeContext(options: {
   return {
     config: options.config,
     frameFormat: options.frameFormat ?? "jpeg",
+    liveFrames: options.liveFrames ?? true,
     sessionId,
     playwrightSession:
       options.playwrightSession ?? `tui-${randomUUID().slice(0, 8)}`,

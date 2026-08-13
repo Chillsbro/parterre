@@ -10,6 +10,8 @@ export interface WorkspaceWriteProposal {
   path: string;
   relativePath: string;
   bytes: number;
+  before: string;
+  after: string;
 }
 
 export type WorkspaceFileWriteResult =

@@ -1,13 +1,9 @@
-import {
-  selectImageProtocol,
-  type TerminalGraphicsInfo
-} from "../probing/index.js";
-import type {FramePainterProtocol} from "./createFramePainter.js";
+import type {TerminalGraphicsInfo} from "../probing/index.js";
 
 export function selectFramePainterProtocol(
   graphics: TerminalGraphicsInfo,
   env: NodeJS.ProcessEnv = process.env
-): FramePainterProtocol | undefined {
-  const protocol = selectImageProtocol(graphics, env);
-  return protocol === "kitty" || protocol === "iterm2" ? protocol : undefined;
+): "kitty" | undefined {
+  if (env.PARTERRE_IMAGE_PROTOCOL === "kitty") return "kitty";
+  return graphics.supportsKittyGraphics ? "kitty" : undefined;
 }
